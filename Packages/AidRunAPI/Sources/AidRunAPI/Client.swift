@@ -1977,7 +1977,8 @@ public struct Client: APIProtocol {
     /// 1. `plannedEndTime` 必须晚于 `plannedStartTime`，否则 400 `BAD_REQUEST`
     /// 2. `plannedStartTime` 不能早于当前时间，否则 400 `BAD_REQUEST`
     /// 3. `plannedStartTime` 距当前时间需至少 `app.order.min-lead-time-minutes`（默认 30）分钟，否则 422 `APPOINTMENT_TOO_SOON`
-    /// 4. `plannedEndTime - plannedStartTime` 不得超过 300 分钟（5 小时），否则 422 `APPOINTMENT_TOO_LONG`（N134）
+    /// 4. `plannedEndTime - plannedStartTime` 不得超过 300 分钟（5 小时），否则 422 `APPOINTMENT_TOO_LONG`（N134）；
+    ///    也不得少于 10 分钟，否则 422 `APPOINTMENT_TOO_SHORT`（#980）
     /// 5. **整段行程**不得有任何一刻落进夜间禁跑窗口 `[22:00, 05:00)`，否则 422 `APPOINTMENT_IN_NIGHT_WINDOW`（N134）。
     ///    判据是整段不是开始时刻：`21:00–22:30` **拒**（尾巴进了夜间），`21:00–22:00` 放行（恰好 22:00 结束不算重叠），
     ///    `05:00–06:00` 放行（恰好 05:00 开始不算重叠）。⚠️ 顺序在 4 之后：跨多天的超长单两条都命中，返回的是 `APPOINTMENT_TOO_LONG`
@@ -1996,7 +1997,7 @@ public struct Client: APIProtocol {
     /// 10. 无紧急联系人时拒绝，403 `EMERGENCY_CONTACT_REQUIRED`（此前复用通用 `ORDER_PERMISSION_DENIED`，前端无法程序化区分场景，2026-07-30 改为专用码）
     ///
     /// 📅 **跨天预约（2026-09-05）**：距开跑超过 `app.order.scheduled-ahead-threshold-minutes`
-    /// （默认 240 分钟）时被接单的订单进入 `SCHEDULED_CONFIRMED` 而不是 `PENDING_ACCEPT`，
+    /// （默认 780 分钟，2026-11-12 起，#897；此前 240）时被接单的订单进入 `SCHEDULED_CONFIRMED` 而不是 `PENDING_ACCEPT`，
     /// 要等志愿者调 `POST /api/orders/{id}/confirm-departure` 才进入出发流程。
     /// 客户端把这一态显示为「已预约，等待志愿者临期确认」。
     ///
@@ -3061,7 +3062,7 @@ public struct Client: APIProtocol {
     /// 这不计入接单率、不影响后续派单，只在 `volunteer_profile.scheduled_no_show_count` 记一笔。
     ///
     /// 触发确认请求的通知是 `SCHEDULED_DEPARTURE_CONFIRM_REQUIRED`（HIGH，会补发 APNs），
-    /// 默认在距开跑 `app.order.departure-confirm-window-minutes`（120 分钟）时下发 ——
+    /// 默认在距开跑 `app.order.departure-confirm-window-minutes`（720 分钟，#897 起；此前 120）时下发 ——
     /// **那条通知与本端点是一对，客户端别只接一个**。
     /// 本端点最早可调的时刻见订单详情的 `earliestDepartureAt`（`SCHEDULED_CONFIRMED` 态下就是它，#307）。
     ///
@@ -3903,7 +3904,7 @@ public struct Client: APIProtocol {
     ///
     /// 提交时校验：
     /// - 改了时间：同下单的门槛 —— `APPOINTMENT_TOO_SOON`(422，提前量 = `app.order.min-lead-time-minutes` + **本轮通话窗口剩余分钟**，
-    ///   保证盲人在窗口最后一刻确认时仍满足最小提前量) / `APPOINTMENT_TOO_FAR` / `APPOINTMENT_OUTSIDE_DUTY_HOURS` / `APPOINTMENT_TOO_LONG` / `APPOINTMENT_IN_NIGHT_WINDOW`(422)；
+    ///   保证盲人在窗口最后一刻确认时仍满足最小提前量) / `APPOINTMENT_TOO_FAR` / `APPOINTMENT_OUTSIDE_DUTY_HOURS` / `APPOINTMENT_TOO_LONG` / `APPOINTMENT_TOO_SHORT` / `APPOINTMENT_IN_NIGHT_WINDOW`(422)；
     ///   跑者那边该时段另有一单 → 409 `INTRO_CALL_PLAN_TIME_UNAVAILABLE`（🚨 **刻意不说原因**，客户端只说「这个时间不行，换一个试试」）
     /// - 陪跑员自己在该时段已答应了别人 → 409 `VOLUNTEER_ALREADY_ENGAGED`（不论改没改时间）
     /// - 改了地点：新集合点不在开放范围内 → 422 `ORDER_OUTSIDE_OPEN_AREA`（#896）；与原约直线距离 > `app.intro-call.plan-max-relocation-meters`（默认 3000 米）→ 422 `INTRO_CALL_PLAN_TOO_FAR_FROM_ORIGINAL`；
