@@ -350,7 +350,7 @@ DRIVER_EN_ROUTE  DRIVER_ARRIVED  COMPLETED  CANCELLED  REMATCHING  NO_VOLUNTEER
 
 <!--
 
-与 §12 的分工：`docs/research/` 记「外面是怎么做的」（联网事实，带来源与核实日期）；
+与 `docs/research/` 的分工：它记「外面是怎么做的」（联网事实，带来源与核实日期）；
 `docs/review/` 记「我们做成了什么样」（对着代码与契约的判断，带 `文件:行号`）。
 一次 review 引用一次 research 是常态，反过来不成立 —— 竞品事实不要写进 review，两处都写会漂移。
 
