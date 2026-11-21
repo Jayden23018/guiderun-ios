@@ -17,8 +17,10 @@
 //     `$(git rev-parse --git-path aidrun-stop-checklist-seen)`（worktree 里 `.git` 是文件，不能拼路径）。别人没写完的脏文件长期躺着时不会每轮都叫；
 //     欠账内容变了才重新叫。
 //   · **欠账只算本轮 Edit/Write 写过的路径**（从 transcript 取，`./transcript.mjs`）。
-//     并行会话或同事在改的脏文件降级为提示；调研落盘同理，会去**本轮会话内的所有分支**
-//     找提交，不只看工作树和 HEAD —— 单开 docs 分支提交调研是常态，只看 HEAD 会每轮误报一次。
+//     并行会话或同事在改的脏文件降级为提示。
+//
+// 2026-11-21（#732）拿掉了两条：「没跑无障碍审计」挪到 pre-push（`a11y-audit-gate.mjs`）——
+// 审计只能真机跑，会话中途拦没有意义；「调研没落盘」删掉 —— 调研留存以全局 skill `web-research` 为准。
 //
 // 交接（收尾第 8 步）**不作独立触发条件**，只写进下面「顺序固定」那句里 —— 纯客户端改动本就不该
 // 投递。2026-09-24 起后端 `docs/handoff.md` 冻结，交接改走后端仓库 GitHub Issues，
@@ -28,10 +30,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isSwiftUIViewEdit } from './design-direction-reminder.mjs';
 import { completedUnarchivedChanges } from './openspec-reminder.mjs';
-import { researchTodo } from './research-log.mjs';
-import { sessionCommands, sessionEditedPaths } from './transcript.mjs';
+import { sessionEditedPaths } from './transcript.mjs';
 
 // AIDRUN_REPO_ROOT 只给自测用（拿一个临时 git 仓库当靶子），生产路径永远走仓库根。
 const root = process.env.AIDRUN_REPO_ROOT || path.resolve(import.meta.dirname, '../..');
@@ -83,10 +83,6 @@ if (payload.stop_hook_active) process.exit(0);
 
 const todo = [];
 
-// 调研落盘。放在最前面：它是「本轮做了但没留下痕迹」，比未提交更容易随会话一起消失。
-const research = researchTodo(payload);
-if (research) todo.push(research);
-
 const sample = (ps) => `${ps.slice(0, 4).join('、')}${ps.length > 4 ? ' …' : ''}`;
 
 // 脏文件不一定是本轮的：这个 checkout 可能被并行会话或同事同时在改。
@@ -112,41 +108,6 @@ if (toArchive.length) {
 }
 // 2026-11-06 起不再因「改了 App 源码没碰 openspec/changes/」拦人：小改动（界面、文案、默认值）不走 OpenSpec，
 // 机器分不出大小档，宁可不拦。仍然硬拦的只有下面这条「待归档」欠账。
-if (mine !== null) {
-  const edited = [...mine];
-  // 改了视图却没跑无障碍审计（#494）。审计没有任何机器在执行（#487 核过：CI 只编译、pre-push 只提醒），
-  // 只能真机手动跑，于是 skill `aidrun-ship-check` §五 那三步只靠自觉 —— 这条把它落成「该做没做」。
-  // 视图判据与设计提醒钩子共用一份；内容读磁盘（停止时文件已写完，删掉的读不到就不算视图）。
-  // ponytail: 只问「本轮跑没跑过」，不问「跑在最后一次改视图之后」；先跑后改照样放行。要更严时改按 transcript 顺序比。
-  const views = edited.filter((p) => isSwiftUIViewEdit('Edit', p, readOrEmpty(path.join(root, p))));
-  const commands = sessionCommands(payload.transcript_path) || [];
-  if (views.length && !commands.some(isAccessibilityAuditRun)) {
-    todo.push(
-      `**没跑无障碍审计**：本轮改了 ${views.length} 个 SwiftUI 视图（${sample(views)}），` +
-        '但没执行过带 `AccessibilityAuditTests` 的 `scripts/device-test.sh` —— 按 skill `aidrun-ship-check` §五' +
-        '跑那一页的审计用例、截图、贴出 `passed/failed` 行与截图；设备不在线就回一句「没跑」再停，不许写成通过'
-    );
-  }
-}
-
-function readOrEmpty(file) {
-  try {
-    return fs.readFileSync(file, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
-// `device-test.sh` 要在**执行位置**上（行首、`;` `&&` `|` `(` 之后，或 `bash` 后面，可带 `VAR=值` 前缀），
-// 且同一条命令里出现 `AccessibilityAuditTests`。挡的是 `grep AccessibilityAuditTests scripts/device-test.sh`
-// 这类只读命令被当成跑过。参数放在 zsh 数组里另起一行时名字在脚本前面，所以只要求同一条命令里有，不要求顺序。
-// ponytail: 只认命令文本，不认结果 —— 跑了但设备不在线照样放行，那时由 §五「明说没跑」兜底。
-// 正则写在函数里：上面的顶层代码先于这里执行，顶层 const 会落进暂时性死区。
-function isAccessibilityAuditRun(command) {
-  const run =
-    /(?:^|[;&|(]|\b(?:bash|sh|zsh|time|nohup)\s)\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:\S*\/)?device-test\.sh\b/m;
-  return run.test(command) && /\bAccessibilityAuditTests\b/.test(command);
-}
 
 // `@{u}` 解析失败有两种成因：
 //   ① 从没设过 upstream —— **不等于没推过**（可能推了没带 -u、可能是游离 HEAD），

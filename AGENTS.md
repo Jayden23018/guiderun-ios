@@ -340,52 +340,13 @@ DRIVER_EN_ROUTE  DRIVER_ARRIVED  COMPLETED  CANCELLED  REMATCHING  NO_VOLUNTEER
 - **零执行不是通过**：`passed=0 failed=0` 一律当失败查。**编译通过不等于测试通过，永远不许把没执行过的测试写成通过。**
 - 🔴 **一次同时改两端的功能，必须后端先合，iOS 才推得上去**。⛔ 别用 `AIDRUN_SKIP_PREPUSH=1` 绕 —— 那一次跳过全部 5 道门禁。
 
-## 12. 联网调研只落一个地方
+## 12. 联网调研
 
-唯一位置 `docs/research/`，唯一索引 `docs/research/INDEX.md`：
+调研怎么查旧账、怎么留存，按全局 skill `web-research`。本仓库 `docs/research/` 只读，不再新增：全局留存库已把它当旧调研读进去。
 
-1. **开搜前整份读 INDEX.md**，按「复核触发条件」判旧结论还作不作数，没触发就直接用。
-2. 新一轮只搜**表里缺的那一段**。
-3. 调研完落 `docs/research/{topic}-{YYYYMMDD}.md`，**并回写 INDEX.md 一行**（日期 / 问题 / 一句话结论 / 复核触发条件 / 报告）。被否掉的方案同样留一行。
-4. 「上次 / 之前」或可能在别的仓库的，先用 `search_session_transcripts`（跨项目，🔴 **只有 30 天**；查询词用错误签名、具体数字这类只在对话里出现的）。
-
-<!--
-
-1. **开搜前整份读 INDEX.md**，按「复核触发条件」列判旧结论还作不作数。没触发就直接用，不要重搜。
-2. 新一轮只搜**表里缺的那一段**，不是把整个问题重来一遍。
-3. 调研完落 `docs/research/{topic}-{YYYYMMDD}.md`，**并回写 INDEX.md 一行**（日期 / 问题 /
-   一句话结论 / 复核触发条件 / 报告，五列齐全）。不回写等于没做 —— 下次搜不到，原样重跑。
-
-4. **索引只管本仓库落过盘的东西。** 用户说「上次 / 之前 / 我们讨论过 / 那个报错」，
-   或要找的东西可能在**别的仓库**（契约类常在后端 `demo`），先用 `search_session_transcripts`
-   —— 它跨项目，返回 `cwd` 可区分。两条判据缺一不可：
-   - 🔴 **只有 30 天**（`cleanupPeriodDays` 默认值，静默清理）。过期的原始会话**彻底消失** ⇒
-     长期记忆只可能在落盘产物里，这正是第 3 条存在的理由。
-   - ⚠️ **查询词要用只可能出现在对话里的**：错误签名、具体数字、命令输出片段。
-     用 `AGENTS.md` / `INDEX.md` / `MEMORY.md` 里有的词，搜回来的全是每会话注入的**回声**
-     （实测搜 `MAMultiPointOverlay` 五条 snippet 逐字相同，搜
-     `Test crashed with signal kill` 四条各不相同且精准）。
-
-   2026-09-20 立此条，当轮即生效：靠它捞出后端仓库 09-19 那份
-   `codebase-comprehension-for-defense-20260919.md`，省掉一轮重复调研。
-   依据见 `docs/research/claude-code-memory-and-session-archival-20260920.md` §2。
-
-被否掉的方案同样留一行：「试过 X 因为 Y 放弃」跟「选了 Z」一样值钱，且更容易被忘。
-
-> 强制在 `scripts/hooks/research-log.mjs`（走 §1.1 + §1.3）：PreToolUse 在联网工具调用前把整份索引
-> 灌回给模型（第 1 条）；Stop 钩子发现本轮联网过但 `docs/research/` 一个字节没动就拦（第 3 条）。
-> 只是查一个 API 签名、不构成调研的，回一句说明再停。
-> 自测 `scripts/validate-research-log.mjs`（CI 与 pre-push 都跑；条数当场看输出，别写在这 —— 理由同 §9，
-> 09-02 核对时这里写的 7 条实际已是 10 条）。
-> **第 4 条抓不成钩子**（机器分不出「该召回却没召回」），走 §1.4 的记忆归档：
-> `cross-session-recall-channels-and-shelf-life`。
->
-> 位置约定本来就写在 skill `tech-decision-research` 里，但 skill 不被显式调用就不生效 ——
-> 于是 `docs/research/` 建了两份报告却一直没有索引。这条是把约定接上强制。
--->
 ## 13. 成体系的 review 也只落一个地方
 
-唯一位置 `docs/review/`、索引 `docs/review/INDEX.md`，规则同 §12（开新 review 前整份读索引，落 `{topic}-{YYYYMMDD}.md` 并回写一行）。research 记「外面怎么做」，review 记「我们做成什么样」（带 `文件:行号`），竞品事实不写进 review。
+唯一位置 `docs/review/`、索引 `docs/review/INDEX.md`：开新 review 前整份读索引，落 `{topic}-{YYYYMMDD}.md` 并回写一行。research 记「外面怎么做」，review 记「我们做成什么样」（带 `文件:行号`），竞品事实不写进 review。
 
 <!--
 
@@ -393,7 +354,7 @@ DRIVER_EN_ROUTE  DRIVER_ARRIVED  COMPLETED  CANCELLED  REMATCHING  NO_VOLUNTEER
 `docs/review/` 记「我们做成了什么样」（对着代码与契约的判断，带 `文件:行号`）。
 一次 review 引用一次 research 是常态，反过来不成立 —— 竞品事实不要写进 review，两处都写会漂移。
 
-> ⚠️ 这条**没有 hook 强制**，`research-log.mjs` 只管联网调研。漏过第二次就按 §1.1 落成守卫。
+> ⚠️ 这条**没有 hook 强制**。漏过第二次就按 §1.1 落成守卫。
 >
 > 2026-08-12 立此条：`frontend-backend-alignment-review-20260812.md` 原本躺在 `docs/` 根目录，
 > 与 20 个同级文档混在一起 —— 下一次 review 既不会先读它，也不会挨着它落盘。已迁入 `docs/review/`。

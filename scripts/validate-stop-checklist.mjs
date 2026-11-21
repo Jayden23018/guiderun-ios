@@ -14,6 +14,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { sessionStartedAt } from './hooks/transcript.mjs';
+
 const hook = path.resolve(import.meta.dirname, 'hooks/stop-checklist.mjs');
 
 // 默认关掉「同样欠账只叫一次」的去重，否则第一条用例跑完就把签名写进 .git/，
@@ -142,39 +144,7 @@ const cases = [
     },
   },
   {
-    // 2026-08-13 真实误报：同一份调研已分 4 个提交推到单开的 docs 分支
-    // （`origin/docs/demo-runbook-research`），当前 HEAD 与工作树自然查不到它，
-    // 于是连报 4 次「本轮联网 N 次但 docs/research/ 没有任何改动」。
-    // 误报的代价是钩子开始被习惯性无视 —— 那等于把它废掉。
-    name: '调研提交在别的分支上时不许报「没落盘」',
-    stdin: '{}',
-    check: () => {
-      const { dir, g } = scratchRepo();
-      const base = g('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim();
-      g('checkout', '-qb', 'docs/x');
-      fs.mkdirSync(path.join(dir, 'docs/research'), { recursive: true });
-      fs.writeFileSync(path.join(dir, 'docs/research/INDEX.md'), '| 日期 | 问题 |\n');
-      fs.writeFileSync(path.join(dir, 'docs/research/topic-20260813.md'), '# 调研\n');
-      g('add', '-A');
-      g('commit', '-qm', 'docs: 调研落盘');
-      g('checkout', '-q', base); // 回到没有 docs/research 的分支，工作树干净
-      const startedAt = new Date(Date.now() - 3600_000).toISOString();
-      const transcript = writeTranscript(
-        dir,
-        'web.jsonl',
-        [{ name: 'WebSearch', input: { query: 'x' } }],
-        startedAt
-      );
-      const r = run(JSON.stringify({ transcript_path: transcript }), { AIDRUN_REPO_ROOT: dir });
-      // 临时仓库必然「无 upstream」，钩子一定会拦 —— 拦不住说明这条根本没跑到判定。
-      if (r.status !== 2) return `期望钩子被其他欠账拦住（exit 2），实得 ${r.status}`;
-      return r.stderr.includes('调研没落盘')
-        ? '调研已提交到别的分支，却仍在报「没落盘」'
-        : null;
-    },
-  },
-  {
-    // 同一场景的另一半：并行会话正在改的脏文件被算成本轮欠账（那次列了 8 个没碰过的文件）。
+    // 2026-08-13 真实误报：并行会话正在改的脏文件被算成本轮欠账（那次列了 8 个没碰过的文件）。
     name: '不是本轮写的脏文件不算欠账，只作提示',
     stdin: '{}',
     check: () => {
@@ -427,50 +397,63 @@ const cases = [
     },
   },
   {
-    // #494：改了视图却没跑无障碍审计。每个场景挡一种错误实现：
-    //   改视图没跑      —— 判据被打回 / 视图判据失效：必须拦
-    //   跑了审计        —— 「改视图就拦」不看命令：必须放
-    //   zsh 数组另起一行 —— 「名字必须在脚本后面」：必须放
-    //   只 grep 了脚本  —— 「命令里同时出现两个词就算跑过」：必须拦
-    //   只跑别的 suite  —— 「跑过 device-test.sh 就算」：必须拦
-    //   只改测试目录    —— 测试文件里也有 `: View`，只靠路径判据排除：必须放
-    //   拿不到 transcript —— 必须不判
-    name: '改了 SwiftUI 视图、本轮没跑带 AccessibilityAuditTests 的 device-test.sh 才报「没跑无障碍审计」',
+    // #732（2026-11-21）：这两条从 Stop 里拿掉了。审计挪到 pre-push（自测 validate-a11y-audit-gate.mjs），
+    // 调研留存改按全局。靶子同时带着本轮写的脏文件：钩子必须照常被「未提交」拦住，
+    // 证明是这两条不报了，而不是整个钩子不拦了。
+    name: '改了 SwiftUI 视图没跑审计、联网没动 docs/research/，都不再报；未提交照常报',
     stdin: '{}',
     check: () => {
-      const { dir } = scratchRepo();
-      const view = 'struct HomeView: View {\n  var body: some View { Text("x") }\n}\n';
-      for (const [f, text] of [
-        ['blindRun/Feature/HomeView.swift', view],
-        ['blindRunUITests/HomeUITests.swift', `import SwiftUI\n${view}`],
-      ]) {
-        fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true });
-        fs.writeFileSync(path.join(dir, f), text);
-      }
-      let n = 0;
-      const flagged = (files, commands = [], payloadExtra = {}) => {
-        const blocks = [
-          ...files.map((f) => ({ name: 'Edit', input: { file_path: path.join(dir, f) } })),
-          ...commands.map((c) => ({ name: 'Bash', input: { command: c } })),
-        ];
-        const transcript = writeTranscript(dir, `a11y-${(n += 1)}.jsonl`, blocks, new Date().toISOString());
-        const r = run(JSON.stringify({ transcript_path: transcript, ...payloadExtra }), { AIDRUN_REPO_ROOT: dir });
-        return r.stderr.includes('**没跑无障碍审计**');
-      };
+      const { dir, g } = scratchRepo();
       const V = 'blindRun/Feature/HomeView.swift';
-      if (!flagged([V])) return '改了视图、没跑审计，却没报';
-      if (flagged([V], ['scripts/device-test.sh -only-testing:blindRunUITests/AccessibilityAuditTests/testHomePassesAccessibilityAudit'])) {
-        return '跑过审计仍在报';
+      fs.mkdirSync(path.join(dir, path.dirname(V)), { recursive: true });
+      // 先提交再改：未跟踪的新目录在 `git status --porcelain` 里只列目录名，对不上本轮写的路径。
+      fs.writeFileSync(path.join(dir, V), 'struct HomeView: View {\n  var body: some View { Text("x") }\n}\n');
+      g('add', '-A');
+      g('commit', '-qm', 'feat: 视图');
+      fs.writeFileSync(path.join(dir, V), 'struct HomeView: View {\n  var body: some View { Text("y") }\n}\n');
+      const transcript = writeTranscript(
+        dir,
+        'trimmed.jsonl',
+        [
+          { name: 'Edit', input: { file_path: path.join(dir, V) } },
+          { name: 'WebSearch', input: { query: 'x' } },
+        ],
+        new Date().toISOString()
+      );
+      const r = run(JSON.stringify({ transcript_path: transcript }), { AIDRUN_REPO_ROOT: dir });
+      if (r.status !== 2 || !r.stderr.includes('**未提交**')) return `本轮写的脏文件没被报成未提交（exit ${r.status}）`;
+      if (r.stderr.includes('没跑无障碍审计')) return 'Stop 里仍在报「没跑无障碍审计」';
+      return r.stderr.includes('调研没落盘') ? 'Stop 里仍在报「调研没落盘」' : null;
+    },
+  },
+  {
+    // 从 validate-research-log.mjs 搬来（那个文件随调研钩子一起删了，#732）。共享 checkout 守卫还在用它。
+    name: 'sessionStartedAt 取得到会话起点；损坏行跳过而不是放弃，只有读不到文件才返回 null',
+    stdin: '{}',
+    check: () => {
+      const { dir: tmp } = scratchRepo();
+      const p = path.join(tmp, 'ts.jsonl');
+      fs.writeFileSync(p, `${JSON.stringify({ timestamp: '2026-08-13T14:11:11.722Z', type: 'x' })}\n{坏行\n`);
+      if (sessionStartedAt(p) !== '2026-08-13T14:11:11.722Z') return `没取到首行 timestamp，实得 ${sessionStartedAt(p)}`;
+
+      // 首行损坏不能放弃整份 transcript，要跳过坏行接着找。
+      const leading = path.join(tmp, 'leading-bad.jsonl');
+      fs.writeFileSync(leading, `{ 这行不是 JSON\n${JSON.stringify({ timestamp: '2026-08-13T15:00:00.000Z' })}\n`);
+      if (sessionStartedAt(leading) !== '2026-08-13T15:00:00.000Z') {
+        return `首行损坏时没跳过去取下一条，实得 ${sessionStartedAt(leading)}`;
       }
-      if (flagged([V], ['args=(-only-testing:blindRunUITests/AccessibilityAuditTests)\ncd /x && AIDRUN_PREFLIGHT_TIMEOUT=1500 scripts/device-test.sh "${args[@]}"'])) {
-        return '参数放在 zsh 数组里跑的审计没被认出来';
+
+      // 一条时间戳都没有（旧格式 / 夹具）：退回文件自身时间，仍然给得出可喂 --since 的值。
+      const noTs = path.join(tmp, 'no-timestamp.jsonl');
+      fs.writeFileSync(noTs, '{ 这行不是 JSON\n');
+      const fallback = sessionStartedAt(noTs);
+      if (!fallback || Number.isNaN(Date.parse(fallback))) {
+        return `没有时间戳时该退回文件时间，实得 ${fallback}`;
       }
-      if (!flagged([V], ['grep -n AccessibilityAuditTests scripts/device-test.sh'])) return '只是 grep 了脚本，却被当成跑过审计';
-      if (!flagged([V], ['scripts/device-test.sh -only-testing:blindRunTests/EmergencySOSTests'])) return '只跑了别的 suite，却被当成跑过审计';
-      if (flagged(['blindRunUITests/HomeUITests.swift'])) return '只改测试目录也被报了';
-      const noTranscript = run(JSON.stringify({ transcript_path: path.join(dir, 'missing.jsonl') }), { AIDRUN_REPO_ROOT: dir });
-      if (noTranscript.stderr.includes('**没跑无障碍审计**')) return '拿不到 transcript 时不该判，却报了';
-      return null;
+
+      // 只有「压根读不到」才是 null —— 调用方靠它区分「没有 transcript」和「有但没干活」。
+      if (sessionStartedAt(path.join(tmp, '不存在.jsonl')) !== null) return '文件不存在时没返回 null';
+      return sessionStartedAt(undefined) === null ? null : '路径缺失时没返回 null';
     },
   },
 ];

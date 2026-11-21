@@ -87,12 +87,12 @@ CI（`.github/workflows/verify.yml`）跑编译门禁 + 规格校验，但**跑�
 这是助盲应用。**无障碍回归 = 功能全损**，不是体验降级 —— 一个丢了 `accessibilityLabel` 的按钮，
 对明眼人是"图标没文字"，对目标用户是"这个按钮不存在"。
 
-**谁在执行这道门（2026-10-20 核过，#487）：只有你。** 没有任何机器会替你跑它：
+**谁在执行这道门（2026-10-20 核过，#487）：只有你。** 没有任何机器会替你跑它，pre-push 只查你跑没跑：
 
 | 通道 | 跑不跑审计 | 证据 |
 |---|---|---|
 | CI `verify.yml` 的 `build` job | ❌ 只编译 | `build-for-testing`，注释写明「只 build-for-testing，不 test」；runner 只有模拟器，高德无 arm64-sim slice |
-| pre-push 钩子 | ❌ | `scripts/hooks/pre-push.sh` 结尾只打一句「真机跑测用 scripts/device-test.sh」 |
+| pre-push 钩子 | ❌ 不跑，只查跑没跑 | `scripts/hooks/a11y-audit-gate.mjs`（#732，从 Stop 钩子挪来）：分支改过 SwiftUI 视图却没有带 `AccessibilityAuditTests` 的 `device-test.sh` 运行记录时，同一份欠账拦一次 push；没跑就在 PR 描述写明「无障碍审计没跑」和原因，再 push 放行 |
 | 改视图时的设计提醒钩子 | ❌ 只提醒截图 | `scripts/hooks/design-direction-reminder.mjs` 第 4 步 |
 | iOS 模拟器（含 iOS Simulator 工具） | ❌ 根本装不上 | 同 CI：高德无 arm64-sim slice。**别去开模拟器截图** |
 | `scripts/device-test.sh` / `device-test-all.sh` | ✅ 唯一通道 | 人或 agent 手动跑真机 |
