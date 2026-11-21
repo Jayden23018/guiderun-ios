@@ -48,16 +48,6 @@
         ]
       },
       {
-        "$comment": "联网调研前把 docs/research/INDEX.md 灌回来：先查记录，缺的那段才重搜。",
-        "matcher": "WebSearch|WebFetch|mcp__firecrawl__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/run.mjs\" research-log pre"
-          }
-        ]
-      },
-      {
         "$comment": "OpenSpec 开工前提醒：本会话第一次改 App 源码、且还没碰 openspec/changes/ 时响一次。非阻断 —— 修 bug 不需要提议，机器分不出。收尾核对在 stop-checklist.mjs。",
         "matcher": "Edit|Write",
         "hooks": [

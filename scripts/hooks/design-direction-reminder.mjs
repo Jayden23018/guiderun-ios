@@ -13,8 +13,7 @@
  *    `some View`。改 Service、Model、测试都不响；
  * 3. **只灌要点不灌全文**（全文 230 行，每次灌进去等于劝人无视它）。
  *
- * 它是**非阻断**的：走 `hookSpecificOutput.additionalContext` + `exit(0)`，
- * 与 `research-log.mjs` 同一个机制。设计流程走没走没有机器判据 —— 拦不了，只能提醒。
+ * 它是**非阻断**的：走 `hookSpecificOutput.additionalContext` + `exit(0)`。设计流程走没走没有机器判据 —— 拦不了，只能提醒。
  *
  * 设计稿索引（`docs/ui/mockups/INDEX.md`）：提醒里总带一句「先读它里面这个界面的那一行」；
  * 另外按**正在改的文件名**去它的「实现落点」列查，命中就把那一行的界面 / 状态 / 决定源直接贴进来

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
-// 会话 transcript（JSONL）的共用读法。Stop 侧两条判定都要它：
-//   - 调研落盘：本轮会话**什么时候开始** —— 用来去所有分支里找本轮的提交，
-//     而不是只看 HEAD 和工作树。
-//   - 未提交：这些脏文件**是不是本轮自己写的**。
-//   - 没跑审计：本轮改了视图，**有没有执行过**无障碍审计的真机命令。
+// 会话 transcript（JSONL）的共用读法。两处要它：
+//   - Stop 清单的「未提交」：这些脏文件**是不是本轮自己写的**。
+//   - 共享 checkout 守卫：本轮会话**什么时候开始**、写过哪些文件。
 //
 // 存在理由（AGENTS.md §1）：2026-08-13 一次会话里「调研没落盘」连报 4 次误报 ——
 // 那份调研已经分 4 个提交推到了单开的 docs 分支（`origin/docs/demo-runbook-research`），
@@ -63,24 +61,6 @@ function realish(p) {
   } catch {
     return p; // 目录已不存在：按原样比，退回旧行为
   }
-}
-
-// 本轮会话执行过的命令原文（Bash 及其他带 `input.command` 字符串的工具），按出现顺序。
-// null = 拿不到 transcript。只是记录里的命令，不代表命令成功了。
-export function sessionCommands(transcriptPath) {
-  const entries = transcriptEntries(transcriptPath);
-  if (entries === null) return null;
-  const commands = [];
-  for (const entry of entries) {
-    const content = entry?.message?.content;
-    if (!Array.isArray(content)) continue;
-    for (const block of content) {
-      if (block?.type !== 'tool_use') continue;
-      const cmd = block.input?.command;
-      if (typeof cmd === 'string' && cmd.trim()) commands.push(cmd);
-    }
-  }
-  return commands;
 }
 
 // 本轮会话用 Edit/Write 写过的文件，仓库相对路径。null = 拿不到 transcript。

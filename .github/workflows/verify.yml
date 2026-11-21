@@ -123,10 +123,10 @@ jobs:
           node scripts/validate-agents-size.mjs --self-test
           node scripts/validate-agents-size.mjs
 
-      # 调研落盘钩子。两种死法都是静默的：pre 吐非法 JSON 就当没注入过，
-      # researchTodo 崩掉 Stop 钩子就整个不拦 —— 都不报错，而约束已经没了。
-      - name: validate research-log hook
-        run: node scripts/validate-research-log.mjs
+      # 合并前的无障碍审计检查（pre-push 调它）。判据放宽就把没跑审计的分支放过去，
+      # 「只拦一次」坏掉就每次 push 都拦 —— 两种都不报错。
+      - name: validate a11y-audit gate
+        run: node scripts/validate-a11y-audit-gate.mjs
 
       # 设计方向提醒钩子。同样两个方向静默失效：判据放宽就变成每次编辑都响的噪音
       # （然后被无视 = 等于没有），判据太窄或吐非法 JSON 就完全不响 ——

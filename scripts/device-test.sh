@@ -357,6 +357,20 @@ xcrun xcresulttool get test-results tests --path "$BUNDLE" --format json 2>/dev/
   | sed 's/^/[device-test] /'
 COVERAGE_STATUS="${PIPESTATUS[1]}"
 
+# ---------- 3.2 记一笔「这个分支跑过无障碍审计」（#732）----------
+#
+# pre-push 的无障碍审计检查（scripts/hooks/a11y-audit-gate.mjs）没有 transcript 可读，只认这份记录。
+# 只在结果可信时记（verdict 0 = 全过，1 = 有失败；两种都是用例真的执行了），零执行、读不出结果都不记。
+case " $* " in
+  *AccessibilityAuditTests*)
+    if [ "$VERDICT_STATUS" -le 1 ] && [ "$COVERAGE_STATUS" -eq 0 ]; then
+      if [ "$VERDICT_STATUS" -eq 0 ]; then A11Y_VERDICT=passed; else A11Y_VERDICT=failed; fi
+      node "$(dirname "$0")/hooks/a11y-audit-gate.mjs" record "$A11Y_VERDICT" \
+        || say "没记上无障碍审计运行记录（不影响测试结论，但 pre-push 会当成没跑）"
+    fi
+    ;;
+esac
+
 say "日志：$LOG"
 say "result bundle：$BUNDLE"
 

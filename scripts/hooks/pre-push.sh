@@ -80,7 +80,7 @@ if [ "$FULL" = "1" ] || touches '^(scripts/|\.claude/|\.github/)'; then
   run_node "validate-guard（冻结文件守卫自测）" scripts/validate-guard.mjs
   run_node "validate-stop-checklist（收尾钩子自测）" scripts/validate-stop-checklist.mjs
   run_node "validate-session-context（开场钩子自测）" scripts/validate-session-context.mjs
-  run_node "validate-research-log（调研落盘钩子自测）" scripts/validate-research-log.mjs
+  run_node "validate-a11y-audit-gate（合并前无障碍审计检查自测）" scripts/validate-a11y-audit-gate.mjs
   run_node "validate-design-reminder（设计方向提醒钩子自测）" scripts/validate-design-reminder.mjs
   run_node "validate-openspec-reminder（OpenSpec 闭环钩子自测）" scripts/validate-openspec-reminder.mjs
   run_node "validate-shared-checkout-guard（共享 checkout 守卫自测）" scripts/validate-shared-checkout-guard.mjs
@@ -128,6 +128,21 @@ if [ "$FULL" = "1" ] || touches '(\.swift$|^\.swiftlint)'; then
       node scripts/swiftlint-ratchet.mjs --json "$1/swiftlint.json" --root "$PWD"
     ' _ "$PREPUSH_TMP"
   fi
+fi
+
+# 无障碍审计（#732，从 Stop 钩子挪来）：本分支改过 SwiftUI 视图却没有审计运行记录时，
+# 同一份欠账拦一次；写明「没跑」后再 push 放行，但计入「被跳过」，末行不会说全部通过。
+# 判据与退出码见 scripts/hooks/a11y-audit-gate.mjs。永远跑：只是一次 git diff。
+if [ -f scripts/hooks/a11y-audit-gate.mjs ]; then
+  echo "[pre-push] 无障碍审计检查（改过 SwiftUI 视图的分支要有审计运行记录）"
+  A11Y_OUT="$(node scripts/hooks/a11y-audit-gate.mjs check 2>&1)"
+  A11Y_RC=$?
+  [ -n "$A11Y_OUT" ] && printf '%s\n' "$A11Y_OUT" | sed 's/^/[pre-push]   /'
+  case "$A11Y_RC" in
+    0) ;;
+    3) echo "[pre-push] ⚠ 无障碍审计没跑。这不算通过。"; SKIPPED_GATES=$((SKIPPED_GATES + 1)) ;;
+    *) echo "[pre-push] ✗ 无障碍审计检查未通过"; fail=1 ;;
+  esac
 fi
 
 # 下面这几道门禁读的后端契约文件（5 份，5 道门禁），
@@ -282,7 +297,7 @@ fi
 
 if [ "$SKIPPED_GATES" -ne 0 ]; then
   echo "[pre-push] 跑过的都通过了，但**有 $SKIPPED_GATES 道门禁被跳过（见上面的 ⚠）**，别当成都验过了。"
-  echo "          读后端契约的门禁被跳过，最常见的原因是 $BACKEND_DIR 不存在或不是后端 checkout；用 AIDRUN_BACKEND_DIR= 指到正确路径。"
+  echo "          读后端契约的门禁被跳过时，最常见的原因是 $BACKEND_DIR 不存在或不是后端 checkout；用 AIDRUN_BACKEND_DIR= 指到正确路径。"
 else
   echo "[pre-push] 通过。提醒：编译通过 ≠ 测试通过，真机跑测用 scripts/device-test.sh。"
 fi
