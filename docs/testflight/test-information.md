@@ -78,11 +78,9 @@ To report a problem, just reply to the invitation email.
 | Review Notes | §2.2 整段。Apple 帮助页写的上限是 4000 **字节**（UTF-8），不是字符；中文按 3 字节计。换掉 `<VIDEO_URL>` 后仍要在 4000 字节以内 |
 | Contact | ⏳ |
 
-ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号；陪跑员账号写不进专用字段。
-⚠️ 检索说明要求账号不进备注（`research/testflight-readiness-delta-20260927.md` §4），
-而核心流程必须两个账号。#454 已答复，**陪跑员账号放哪里仍待负责人定**：
-要么在备注里写陪跑员号码（只写号码、不写验证码，验证码与跑者相同），要么请审核员通过联系方式索取。
-下面的草稿按「备注里只写 See Sign-in field」写，没有泄露任何号码。
+ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号。陪跑员账号写进备注：Apple 帮助页
+「Platform version information」原文是 "Details for additional accounts should be included in the Notes field."（2026-11-25 读）。
+本仓库是公开的，草稿里只写占位 `<VOLUNTEER_PHONE>`，填 ASC 时换成后端私有仓库 `docs/test-accounts.md` §2.3 的陪跑员号码。
 
 ### 2.2 Review Notes（英文，填进 ASC）
 
@@ -92,7 +90,7 @@ GuideRun (助盲跑, UI in Simplified Chinese) matches blind and low-vision runn
 VIDEO of the full two-device flow: <VIDEO_URL>
 
 SIGN IN
-Enter the phone number from the Sign-in field, tap the button to get a code, then enter the fixed code (also in the Sign-in field). No SMS is sent to these test numbers. Both accounts are already verified; no ID or face check will be asked. The review accounts are not limited to our launch city (Shenzhen) or to our service hours.
+Runner device: use the phone number and fixed code from the Sign-in field. Volunteer device: phone <VOLUNTEER_PHONE>, same fixed code. Enter the number, tap the button to get a code, then enter the code. No SMS is sent to these test numbers. Both accounts are already verified; no ID or face check will be asked. The review accounts are not limited to our launch city (Shenzhen) or to our service hours.
 
 BEFORE YOU START (both devices)
 1. Runs cannot overlap 22:00-05:00 China time, which is 06:00-13:00 US Pacific Standard Time. Please book a start time after 13:30 PST.
@@ -122,7 +120,7 @@ NO HIDDEN FEATURES (Guideline 2.5.19)
 No hidden, dormant or remotely enabled features. Our development-only mock server, server switcher and an unfinished companion-map tab are compiled out of this build; it always uses our production server.
 
 HELP / SOS - PLEASE DO NOT TRIGGER
-The help (SOS) button only sends an alert while a run is in progress. The alert goes to our real support staff, and the server texts the account's emergency contact. It does not replace a call to 110 or 120 and does not contact the police or an ambulance service. At any other time the help button only offers to dial the emergency contact or 110/120. Please do not dial them either.
+The help (SOS) button only sends an alert while a run is in progress. The alert goes to our real support staff, and the server texts the account's emergency contact. It does not call the police or an ambulance. At any other time the help button only offers to dial the emergency contact or 110/120. Please do not dial them either.
 ```
 
 ### 2.3 账号（✅ 后端已建好；号码不进本仓库）
@@ -156,7 +154,9 @@ The help (SOS) button only sends an alert while a run is in progress. The alert 
 | 屏幕录制 | 控制中心开录屏，**关麦克风**（避免录进周围人声） | 同左 |
 | 账号状态 | 没有进行中的单 | 没有未完成的单（最多 3 张，且时段冲突会被拒） |
 
-开拍时刻：北京时间 05:00–21:00 之间（整段行程不能碰 22:00–05:00，含跑步时长）。
+开拍时刻：北京时间 05:00–21:00 之间（整段行程不能碰 22:00–05:00，含跑步时长）。审核号不受开放城市和值守时段限制，在哪儿拍都行。
+
+> 2026-11-25 按 `origin/main` @ `ec77ea8e` 改第 4–7、12、13 步：约跑改成先匹配后通话（#806、#917），陪跑员填见面安排、跑者确认；按钮名逐个 `git grep` 过，第 6 步改开跑时间那一下没有真机走过，拍的时候顺便验。
 
 ### 3.2 步骤
 
@@ -165,17 +165,17 @@ The help (SOS) button only sends an alert while a run is in progress. The alert 
 | 1 | A | 登录：输入手机号 →「获取验证码」→ 输入固定验证码 →「登录」 | 陪跑员首页 |
 | 2 | A | 滑块「向右滑动，我现在有空陪跑」滑到底 | 滑块变为「接单中」。**之后 A 一直停在前台**，进后台超过 30 秒会收不到派单 |
 | 3 | B | 同样登录 | 跑者首页 |
-| 4 | B | 「预约新的陪跑」→ 出发点保留「当前位置」→「下一步：预约时间」→ 选 **30–35 分钟后** →「下一步：跑步需求」→「下一步：确认预约」→「提交预约」 | 「正在匹配陪跑员」 |
-| 5 | A | 等派单弹出（一般 1 分钟内），点「接下这次陪跑」 | 进入通话磨合页 |
-| 6 | B | 页面变为「有位志愿者想陪你跑」，点「和这位志愿者通话确认」→「聊过了，合适」 | **不点**「打电话给这位志愿者」 |
-| 7 | A | 「合适，接这一单」 | 订单页进入「约好」态 |
+| 4 | B | 「预约新的陪跑」→ 出发点保留当前位置 → 日期选今天、时段选最早一档 →「开始找陪跑员」 | 「正在匹配陪跑员」 |
+| 5 | A | 等邀请弹出（一般 1 分钟内），点「接下这次陪跑」 | 进入「先通个电话」 |
+| 6 | A | 「填写见面安排」→ 开跑时间改成约 35 分钟后 → 点底部提交按钮（「提交，请跑者确认」或「提交跑者确认」） | A 显示「已提交见面安排」；**不点**任何拨号按钮 |
+| 7 | B | 「确认见面安排」 | 两端进入「约好」 |
 | 8 | A | 「我出发了」 | B 显示「…正在赶来」 |
 | 9 | A | 「我已到达集合点」 | B 显示「…已到达」 |
 | — | | ✂️ **剪掉等待**：一直等到**计划开跑时刻前 15 分钟以内**（「开始跑步」的时间闸，见 §4 第 5 条）。字幕：「此处等待约 N 分钟」 | |
 | 10 | B | 「开始跑步」 | B 播「准备开始」「握好引导绳」三秒倒计时；A 同时切到跑步中页 |
 | 11 | A、B | 各拍一下跑步中页面，镜头带过求助入口（A 右上角「求助与安全」、B 的「一键求助」）**但不点** | 字幕：「求助仅在跑步中可用，审核时请勿触发」 |
-| 12 | A | 按住「长按 2 秒，结束陪跑」 | 两端都显示「服务已完成」 |
-| 13 | B | 进入跑后记录（「这次跑步」），再回到评价区，可以点「跳过评价并返回首页」 | 结束录屏 |
+| 12 | A | 按住「结束陪跑」2 秒 | 两端都显示「服务已完成」 |
+| 13 | B | 在完成页稍停，让镜头带到跑步数据，然后点「返回首页」 | 结束录屏 |
 
 步骤 10 如果早于「开跑前 15 分钟」点，B 会念「还没到可以开始跑步的时间，请稍后再按。」，这段要剪掉。
 
