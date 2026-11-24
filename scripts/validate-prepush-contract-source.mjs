@@ -78,7 +78,7 @@ const FILES = {
   'docs/voice-golden-corpus.json': (tag) => `{"corpus":"${tag}"}\n`,
   'src/main/java/com/example/demo/exception/ErrorCode.java': (tag) => `enum ErrorCode { ${tag} }\n`,
   'src/main/java/com/example/demo/util/VoiceSlotParser.java': (tag) => `class VoiceSlotParser { ${tag} }\n`,
-  'src/main/java/com/example/demo/service/VoiceOrderService.java': (tag) => `class VoiceOrderService { ${tag} }\n`,
+  'src/main/java/com/example/demo/service/VoiceAddressResolver.java': (tag) => `class VoiceAddressResolver { ${tag} }\n`,
 };
 const writeContracts = (tag) => {
   for (const [rel, make] of Object.entries(FILES)) {
