@@ -7,6 +7,7 @@ extension AppState {
 
     /// 启动时恢复会话（Token 从 Keychain 读取，兼容旧版本 UserDefaults 存量）
     func restoreSession() async {
+        startNetworkPermissionRetry()
         sessionRestorationState = .restoring
         accessToken = restoredToken()
         if let roleRaw = persistence.string(forKey: AppConstants.UserDefaultsKeys.activeRole) {
