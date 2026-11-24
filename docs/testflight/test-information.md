@@ -75,7 +75,7 @@ To report a problem, just reply to the invitation email.
 | Sign-in required | 勾选 |
 | User name | 审核跑者账号的手机号（§2.3） |
 | Password | 固定验证码（§2.3） |
-| Review Notes | §2.2 整段，≤ 4000 字符 |
+| Review Notes | §2.2 整段。Apple 帮助页写的上限是 4000 **字节**（UTF-8），不是字符；中文按 3 字节计。换掉 `<VIDEO_URL>` 后仍要在 4000 字节以内 |
 | Contact | ⏳ |
 
 ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号；陪跑员账号写不进专用字段。
@@ -87,42 +87,42 @@ ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号
 ### 2.2 Review Notes（英文，填进 ASC）
 
 ```text
-AidRun (UI in Simplified Chinese) matches blind runners with volunteer running guides. The core flow needs TWO accounts on TWO iPhones: a Runner (books a run) and a Volunteer (accepts it).
+GuideRun (助盲跑, UI in Simplified Chinese) matches blind and low-vision runners with volunteer running guides. The core flow needs TWO accounts on TWO iPhones: a Runner (books a run) and a Volunteer (accepts it).
 
 VIDEO of the full two-device flow: <VIDEO_URL>
 
 SIGN IN
-Enter the phone number from the Sign-in field, tap the button to get a code, then enter the fixed code (also in the Sign-in field). No SMS is sent to these test numbers. Both accounts are already verified; no ID or face check will be asked.
+Enter the phone number from the Sign-in field, tap the button to get a code, then enter the fixed code (also in the Sign-in field). No SMS is sent to these test numbers. Both accounts are already verified; no ID or face check will be asked. The review accounts are not limited to our launch city (Shenzhen) or to our service hours.
 
 BEFORE YOU START (both devices)
-1. Set the time zone to Shanghai, China: Settings > General > Date & Time > turn off Set Automatically > Time Zone. Our server runs on China time; with a US time zone, bookings are rejected as "in the past". This is a known issue we are fixing.
-2. Runs cannot overlap 22:00-05:00 China time, which is 07:00-14:00 US Pacific Daylight Time (06:00-13:00 PST after Nov 1). Please book from 13:30 PDT for a start at 14:00 or later.
-3. Allow Location on both devices. Keep the two devices within 5 km of each other.
+1. Runs cannot overlap 22:00-05:00 China time, which is 06:00-13:00 US Pacific Standard Time. Please book a start time after 13:30 PST.
+2. Allow Location on both devices. Keep the two devices within 5 km of each other.
+3. If a booking is rejected as "in the past", set the time zone to Shanghai, China: Settings > General > Date & Time.
 
-STEPS (about 25 minutes, mostly waiting for the start time)
-1. Volunteer device: sign in, swipe the slider right to start taking orders, keep the app open in the foreground.
-2. Runner device: sign in, tap "预约新的陪跑" (book a run). Start point: keep "当前位置" (current location); address search only covers mainland China. Start time: 30-35 minutes from now. Submit with "提交预约".
+STEPS (about 25 minutes, mostly waiting)
+1. Volunteer device: sign in, swipe the slider "向右滑动，我现在有空陪跑" to the right, keep the app open in the foreground.
+2. Runner device: sign in, tap "预约新的陪跑" (book a run). Keep the current location as the start point; address search only covers mainland China. Choose today and the earliest time slot, then tap "开始找陪跑员" (find a guide).
 3. Volunteer device: an invitation appears, usually within a minute. Tap "接下这次陪跑" (accept).
-4. The first order between two accounts has an "intro call" step. You do NOT need to call. Runner: tap "和这位志愿者通话确认", then "聊过了，合适". Volunteer: tap "合适，接这一单". Please do not dial any number shown; they are test numbers.
+4. The first run between two accounts has an "intro call" step. You do NOT need to call. Volunteer: tap "填写见面安排" (meetup plan), set the start time to about 35 minutes from now, then tap the submit button ("提交..."). Runner: tap "确认见面安排" (confirm). Please do not dial any number shown; they are test numbers.
 5. Volunteer: tap "我出发了" (on my way), then "我已到达集合点" (arrived). The runner device shows the volunteer's progress.
-6. Runner: once the two of you meet, tap "开始跑步" (start run). It is accepted from 15 minutes BEFORE the planned start time; an earlier tap only reads a "too early" message. The runner device counts down three seconds and both devices switch to the running screen.
-7. Volunteer: long-press "长按 2 秒，结束陪跑" (finish). Both devices show the completed run.
+6. Runner: tap "开始跑步" (start run). It is accepted from 15 minutes BEFORE the planned start time; an earlier tap only reads a "too early" message.
+7. Volunteer: press and hold "结束陪跑" (finish) for 2 seconds. Both devices show the completed run.
 
 OUTSIDE MAINLAND CHINA
-Maps and address search come from AMap (Gaode), a mainland-China provider. Outside China the map may show little detail and search returns no results. The order flow does not depend on them; matching is by distance.
+Maps and address search come from AMap (Gaode), a mainland-China provider, and may show little outside China. The order flow does not depend on them; matching is by distance.
 
 PERMISSIONS
-- Location (When In Use): sets the start point, matches nearby volunteers, and shares both people's positions from "on my way" until the run ends. Background location (UIBackgroundModes: location) is on only in that window: the volunteer often switches to a navigation app, and the waiting runner must see them coming. The blue indicator shows; it stops when the order ends. We never request Always.
-- Microphone + Speech Recognition: blind users describe the place, route and notes by voice instead of typing. Only while the voice button is active.
-- Motion & Fitness: steps, cadence and elevation gain, recorded only during an active run and shown in the run record. Optional; running works without it.
-- Camera: volunteer identity liveness check at sign-up. The review accounts are already verified, so you will not see it.
+- Location (When In Use): sets the start point, matches nearby volunteers, and shares both people's positions from "on my way" until the run ends. Background location is on only in that window, because the volunteer often switches to a navigation app and the waiting runner must see them coming. We never request Always.
+- Microphone + Speech Recognition: optional dictation, so blind users can speak instead of type messages, feedback and reports. Only while the dictation button is active.
+- Motion & Fitness: steps, cadence and elevation gain, recorded only during a run and shown in the run record. Optional.
+- Camera: volunteer liveness check at sign-up. The review accounts are already verified.
 - Notifications: new orders and order status.
 
 NO HIDDEN FEATURES (Guideline 2.5.19)
 No hidden, dormant or remotely enabled features. Our development-only mock server, server switcher and an unfinished companion-map tab are compiled out of this build; it always uses our production server.
 
 HELP / SOS - PLEASE DO NOT TRIGGER
-The help (SOS) button only sends an alert while a run is in progress. The alert goes to our real support staff, and the server tries to text the account's emergency contact. It does not replace a call to 110 or 120 and does not contact the police or an ambulance service. At any other time the help button only offers to dial the emergency contact or local emergency numbers (110/120). Please do not dial them either.
+The help (SOS) button only sends an alert while a run is in progress. The alert goes to our real support staff, and the server texts the account's emergency contact. It does not replace a call to 110 or 120 and does not contact the police or an ambulance service. At any other time the help button only offers to dial the emergency contact or 110/120. Please do not dial them either.
 ```
 
 ### 2.3 账号（✅ 后端已建好；号码不进本仓库）
