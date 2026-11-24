@@ -49,10 +49,11 @@ if (!fs.existsSync(javaPath)) {
   process.exit(1);
 }
 
-// 序数那一族在另一个类里：播报文案由 `VoiceOrderService` 拼，`VoiceSlotParser` 不管它。
+// 序数那一族在另一个类里：候选播报由 `VoiceAddressResolver` 拼，`VoiceSlotParser` 不管它。
+// 后端 #1030（2026-11-23）把它从 `VoiceOrderService` 搬到了这里。
 const servicePath = path.resolve(
   path.dirname(javaPath),
-  process.env.AIDRUN_BACKEND_VOICE_SERVICE ?? '../service/VoiceOrderService.java'
+  process.env.AIDRUN_BACKEND_VOICE_SERVICE ?? '../service/VoiceAddressResolver.java'
 );
 
 // ---------------------------------------------------------------- 后端

@@ -277,16 +277,17 @@ else
   SKIPPED_GATES=$((SKIPPED_GATES + 1))
 fi
 
-# 这一道读两个 .java：VoiceSlotParser（INTENT_* 正则）与 VoiceOrderService（序数播报用词）。
+# 这一道读两个 .java：VoiceSlotParser（INTENT_* 正则）与 VoiceAddressResolver（序数播报用词；
+# 后端 #1030 于 2026-11-23 把它从 VoiceOrderService 搬过去）。
 # 两个都必须走 backend_file —— 2026-08-12 合 #16 时发现它俩漏在外面，仍直接指向工作区路径，
 # 于是第 5 道门禁会绕过「取自 origin/main」这条约定，正是本文件上面那段注释警告的情形。
 VOICE_PARSER="$(backend_file src/main/java/com/example/demo/util/VoiceSlotParser.java VoiceSlotParser.java "${AIDRUN_BACKEND_VOICE_PARSER:-}")"
-VOICE_SERVICE="$(backend_file src/main/java/com/example/demo/service/VoiceOrderService.java VoiceOrderService.java "${AIDRUN_BACKEND_VOICE_SERVICE:-}")"
+VOICE_SERVICE="$(backend_file src/main/java/com/example/demo/service/VoiceAddressResolver.java VoiceAddressResolver.java "${AIDRUN_BACKEND_VOICE_SERVICE:-}")"
 if [ -f "$VOICE_PARSER" ] && [ -f "$VOICE_SERVICE" ]; then
   run "validate-voice-intent-words" env AIDRUN_BACKEND_VOICE_SERVICE="$VOICE_SERVICE" \
     node scripts/validate-voice-intent-words.mjs "$VOICE_PARSER"
 else
-  echo "[pre-push] ⚠ 跳过确认轮词表对撞：从 $(source_label "${AIDRUN_BACKEND_VOICE_PARSER:-}" AIDRUN_BACKEND_VOICE_PARSER) 取不到 VoiceSlotParser.java / VoiceOrderService.java。这不算通过。"
+  echo "[pre-push] ⚠ 跳过确认轮词表对撞：从 $(source_label "${AIDRUN_BACKEND_VOICE_PARSER:-}" AIDRUN_BACKEND_VOICE_PARSER) 取不到 VoiceSlotParser.java / VoiceAddressResolver.java。这不算通过。"
   SKIPPED_GATES=$((SKIPPED_GATES + 1))
 fi
 
