@@ -111,7 +111,7 @@ Maps and address search come from AMap (Gaode), a mainland-China provider, and m
 
 PERMISSIONS
 - Location (When In Use): sets the start point, matches nearby volunteers, and shares both people's positions from "on my way" until the run ends. Background location is on only in that window, because the volunteer often switches to a navigation app and the waiting runner must see them coming. We never request Always.
-- Microphone + Speech Recognition: optional dictation, so blind users can speak instead of type messages, feedback and reports. Only while the dictation button is active.
+- Microphone + Speech Recognition: optional dictation in text fields (place search, notes, messages, feedback, reports), so blind users can speak instead of type. Only while the dictation button is active.
 - Motion & Fitness: steps, cadence and elevation gain, recorded only during a run and shown in the run record. Optional.
 - Camera: volunteer liveness check at sign-up. The review accounts are already verified.
 - Notifications: new orders and order status.

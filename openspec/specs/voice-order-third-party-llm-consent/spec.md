@@ -45,7 +45,7 @@ TBD - created by archiving change gate-voice-ordering-on-third-party-llm-consent
 
 ### Requirement: 首启告知与内置隐私说明披露语音输入
 
-首启告知 SHALL 有一条独立的话说明：留言、反馈和举报时可以用语音输入，说的话经苹果的语音识别转成文字，我们只收到文字，不用也可以打字。首启告知、首屏摘要和内置隐私说明 MUST NOT 再提通义千问。`appLaunch` 的 `disclosureVersion` MUST 从 4 升到 5（新披露一个接收方：苹果的语音识别）。
+首启告知 SHALL 有一条独立的话说明：在输入框旁点语音输入时，说的话经苹果的语音识别转成文字填进输入框，不用也可以打字。用途 MUST NOT 写得比实际调用语音输入的场景窄。首启告知、首屏摘要和内置隐私说明 MUST NOT 再提通义千问。`appLaunch` 的 `disclosureVersion` MUST 从 4 升到 5（新披露一个接收方：苹果的语音识别）。
 
 #### Scenario: 老用户冷启动
 - **WHEN** 已同意 v4 首启告知的用户升级后冷启动

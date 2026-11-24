@@ -267,13 +267,13 @@ final class PrivacyConsentTests: XCTestCase {
 
     /// 语音下单 2026-11-23 永久下线（OpenSpec remove-voice-order-model-disclosure）。#374 原本要求三处都点名
     /// 通义千问；现在首启告知、首屏摘要、内置隐私政策都**不许**再提它，否则就是告诉用户一个不存在的接收方。
-    /// 语音听写仍在用（留言、反馈、举报），它走苹果的语音识别 —— 这件事首启告知和内置隐私政策都要说。
+    /// 语音听写仍在用（搜索地点、补充说明、留言、反馈、举报），它走苹果的语音识别 —— 这件事首启告知和内置隐私政策都要说。
     /// 语音下单单独同意页的文案留着（代码还在、入口已删），这里不再管它。
     func testLaunchNoticeAndPolicyDescribeDictationAndNoLongerNameTheLLM() throws {
         let launch = PrivacyConsentPurpose.appLaunch.disclosures
         XCTAssertFalse(launch.joined().contains("通义千问"), "首启告知还在提通义千问")
         XCTAssertFalse(launch.joined().contains("语音下单"), "首启告知还在提语音下单")
-        let dictation = try XCTUnwrap(launch.first { $0.hasPrefix("留言、反馈和举报时可以用语音输入") })
+        let dictation = try XCTUnwrap(launch.first { $0.hasPrefix("在输入框旁点语音输入时") })
         XCTAssertTrue(dictation.contains("苹果的语音识别") && dictation.contains("直接打字"), dictation)
         let summary = try XCTUnwrap(PrivacyConsentPurpose.appLaunch.launchSummary)
         XCTAssertFalse(summary.contains("通义千问"), summary)
@@ -339,7 +339,7 @@ final class PrivacyConsentTests: XCTestCase {
             // 2026-11-25 指纹变了**且版本号 4 → 5**，「行为变了」那一档（OpenSpec remove-voice-order-model-disclosure）：
             // 语音下单下线，通义千问不再是接收方；同时新披露苹果的语音识别（语音输入的音频经苹果服务器转文字）。
             // App 还没上架，+1 只让 TestFlight 测试员重新同意一次。
-            .appLaunch: (5, 521_303_728),
+            .appLaunch: (5, 999_469_758),
             // 2026-09-10 指纹又变了而版本号仍不动，同样是**有意的**：
             // 第 4 条里把「视力状况」加进敏感信息那一句。这两个字段的收集、用途、接收方、
             // 保留规则一个字节都没改（iOS 侧此前压根没有采集入口，值来自后端建档默认值），
