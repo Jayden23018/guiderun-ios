@@ -36,3 +36,17 @@ extension AppState {
         }
     }
 }
+
+extension AppState {
+    /// 用户在系统弹窗里点了「允许联网」后，重做启动时因没有授权而失败的请求（#1008）。
+    func retryLaunchRequestsAfterNetworkPermission() async {
+        if case .validationFailed = sessionRestorationState {
+            await restoreSession()
+        }
+        if legalLinks == nil {
+            didAttemptLegalLinksLoad = false
+            await loadLegalLinksIfNeeded()
+        }
+        await loadFeatureFlagsIfNeeded()
+    }
+}

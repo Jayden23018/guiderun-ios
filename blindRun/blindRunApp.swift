@@ -111,6 +111,9 @@ struct blindRunApp: App {
                     // 因此有一段能听出来的延迟（2026-08-06 真机报的「点开始约跑之后要等一下」）。
                     speechInputService.prepareForPlaybackAtLaunch()
                     configurePushNotifications()
+                    NetworkPermission.startMonitoring { [weak appState] in
+                        Task { await appState?.retryLaunchRequestsAfterNetworkPermission() }
+                    }
                     Task { await appState.restoreSession() }
                 }
                 .onChange(of: scenePhase) { phase in
