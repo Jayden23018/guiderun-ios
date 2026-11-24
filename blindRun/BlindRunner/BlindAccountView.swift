@@ -88,7 +88,7 @@ struct BlindAccountView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(PrivacyAuthorizationCopy.title)
-                .accessibilityHint("查看并撤回语音下单、视力状况和陪跑位置共享这三项同意")
+                .accessibilityHint("查看并撤回视力状况和陪跑位置共享这两项同意")
                 .accessibilityIdentifier("blindPrivacyAuthorizationSettingsEntry")
 
                 GroupedCardDivider()

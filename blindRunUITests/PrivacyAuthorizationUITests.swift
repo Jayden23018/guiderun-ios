@@ -2,7 +2,8 @@ import XCTest
 
 /// 单独成文件：`blindRunUITests.swift` 已超长，SwiftLint 棘轮不许它再变长（同 `AccountDeletionBlockedUITests`）。
 extension blindRunUITests {
-    /// #754 起「隐私与授权」分两层：第一层三行只看状态、没有撤回按钮；撤回行在每项的详情页里。
+    /// #754 起「隐私与授权」分两层：第一层只看状态、没有撤回按钮；撤回行在每项的详情页里。
+    /// 2026-11-25 起第一层没有语音下单那一行（语音下单下线，OpenSpec remove-voice-order-model-disclosure）。
     /// 撤回行可点高度 ≥ 64pt，读屏标签说清撤回哪一项。UI 用例默认跳过语音与位置两项同意（环境变量），
     /// 所以两项都显示为已同意、详情页都有撤回行；撤回后的状态切换由单测 `PrivacyAuthorizationTests` 守。
     @MainActor
@@ -12,10 +13,10 @@ extension blindRunUITests {
         tapNavigationRow(app, labelBeginsWith: "隐私与授权")
         let listBar = app.navigationBars["隐私与授权"]
         XCTAssertTrue(listBar.waitForExistence(timeout: 10), "没进到隐私与授权页")
-        XCTAssertFalse(app.buttons["privacyRevokeVoiceOrderConsent"].exists, "第一层不该再有撤回按钮")
+        XCTAssertFalse(app.buttons["privacyRevokeLocationTrackConsent"].exists, "第一层不该再有撤回按钮")
+        XCTAssertFalse(app.descendants(matching: .any)["privacyVoiceOrderConsentEntry"].exists, "语音下单已下线，第一层不该再有这一行")
 
         let items = [
-            (entry: "privacyVoiceOrderConsentEntry", revoke: "privacyRevokeVoiceOrderConsent", word: "语音下单"),
             (entry: "privacyLocationTrackConsentEntry", revoke: "privacyRevokeLocationTrackConsent", word: "位置"),
         ]
         for item in items {

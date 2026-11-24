@@ -50,12 +50,10 @@ extension AccessibilityAuditTests {
             XCTAssertFalse(app.staticTexts["助盲跑 MVP"].exists, "\(role)：MVP 字样还在")
             XCTAssertFalse(app.staticTexts["iOS SwiftUI Demo"].exists, "\(role)：Demo 字样还在")
 
-            let modelName = any["aboutVoiceOrderModelName"].firstMatch
-            XCTAssertTrue(modelName.exists, "\(role)：没有公示大模型名称")
-            XCTAssertEqual(modelName.label, "语音下单使用的大模型：通义千问大模型", "\(role)：模型名称读屏不对")
-            let modelNumber = any["aboutVoiceOrderModelFilingNumber"].firstMatch
-            XCTAssertTrue(modelNumber.exists, "\(role)：没有公示大模型备案号")
-            XCTAssertEqual(modelNumber.label, "大模型备案号：ZheJiang-TongYiQianWen-20230901", "\(role)：模型备案号读屏不对")
+            // 语音下单 2026-11-23 下线，大模型公示一起删（OpenSpec remove-voice-order-model-disclosure）。
+            // App Store Connect 合规页 AIGC 答了「否」，公示还在就是申报不一致。
+            XCTAssertFalse(any["aboutVoiceOrderModelName"].exists, "\(role)：大模型公示还在")
+            XCTAssertFalse(app.staticTexts["大模型公示"].exists, "\(role)：大模型公示还在")
 
             attachScreenshot(app, name: "about-filing-\(role)")
             app.terminate()

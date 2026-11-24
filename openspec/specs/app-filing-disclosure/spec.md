@@ -31,11 +31,3 @@ TBD - created by archiving change disclose-app-filing-in-about. Update Purpose a
 - **WHEN** VoiceOver 用户浏览备案信息
 - **THEN** 读屏念出完整编号，网址是可以双击激活的链接
 
-### Requirement: 「关于」页公示语音下单使用的大模型
-
-「关于」页 SHALL 公示语音下单使用的大模型名称和大模型备案号。
-
-#### Scenario: 查看大模型公示
-- **WHEN** 用户打开「关于」页
-- **THEN** 页面显示「通义千问大模型」和备案号「ZheJiang-TongYiQianWen-20230901」
-

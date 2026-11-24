@@ -362,14 +362,14 @@ struct BlindHomeBookingBlock: View {
         .modifier(BookingBlockIdentifier(isEnabled: isEnabled))
     }
 
-    /// 视觉副标题只说「选好时间和地点」，而**按下去真正发生的事是开始录音**。
+    /// 按下去打开约跑页（`BlindMatchFirstBookingView`）：选出发地点、日期和时段。
     ///
-    /// 所以 hint 不能照抄副标题：看得见的人按下去会看到麦克风界面，看不见的人只有这一句话
-    /// 可以依据。改版前那个 hint 写全了这件事，这里保留 —— 丢掉它是可发现性的实打实回退。
+    /// 2026-11-25 前这句说「双击后进入语音下单」，语音下单 11-23 永久下线后已经不对
+    /// （OpenSpec remove-voice-order-model-disclosure）。hint 仍要写清按下去会到哪一页 ——
+    /// 看不见的人只有这一句话可以依据。
     static func bookingHint(isEnabled: Bool) -> String {
         guard isEnabled else { return "双击后说明如何先确认当前订单状态" }
-        return "选好时间和地点，系统帮你找陪跑员。双击后进入语音下单：说一句想什么时候跑、跑多久，"
-            + "听完复述再确认；也可以改用表单填写"
+        return "双击后选出发地点、日期和时段，系统帮你找陪跑员"
     }
 }
 

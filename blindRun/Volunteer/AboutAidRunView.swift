@@ -10,7 +10,6 @@ struct AboutAidRunView: View {
         List {
             AppIdentitySection()
             AppFilingSection(mapApprovalNumber: AMapManager.mapContentApprovalNumber())
-            GenerativeModelDisclosureSection()
             LegalDocumentsSection(links: appState.legalLinks)
         }
         // 原来底部留的 96pt 空白是给常驻求助条让位的；求助条 #605 已删、这一页又藏了标签栏，空白一起去掉。
