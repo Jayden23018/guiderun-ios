@@ -43,11 +43,15 @@ TBD - created by archiving change gate-voice-ordering-on-third-party-llm-consent
 - **WHEN** VoiceOver 用户在同意弹窗向右滑动
 - **THEN** 先到标题，再到摘要和「查看详细说明」，最后到两个按钮；无法滑到背后的下单页
 
-### Requirement: 首启告知与内置隐私说明披露第三方大模型
+### Requirement: 首启告知与内置隐私说明披露语音输入
 
-首启告知 SHALL 有一条独立的话说明语音下单的转写文字会发给阿里云通义千问；`appLaunch` 的 `disclosureVersion` MUST +1。内置隐私政策 SHALL 在「麦克风与语音内容」一条与「第三方 SDK」一节各补一句同样的事实。
+首启告知 SHALL 有一条独立的话说明：在输入框旁点语音输入时，说的话经苹果的语音识别转成文字填进输入框，不用也可以打字。用途 MUST NOT 写得比实际调用语音输入的场景窄。首启告知、首屏摘要和内置隐私说明 MUST NOT 再提通义千问。`appLaunch` 的 `disclosureVersion` MUST 从 4 升到 5（新披露一个接收方：苹果的语音识别）。
 
 #### Scenario: 老用户冷启动
-- **WHEN** 已同意 v3 首启告知的用户升级后冷启动
-- **THEN** 再次看到首启告知，其中含通义千问那一条
+- **WHEN** 已同意 v4 首启告知的用户升级后冷启动
+- **THEN** 再次看到首启告知，其中有语音输入那一条，没有通义千问
+
+#### Scenario: 断网读内置隐私说明
+- **WHEN** 用户在拉不到完整隐私政策时打开内置隐私说明
+- **THEN** 麦克风那一条说的是语音输入，「第三方 SDK」一节没有通义千问
 

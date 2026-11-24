@@ -80,7 +80,7 @@ struct BlindAccountView: View {
                 .padding(.top, 8)
                 .accessibilityAddTraits(.isHeader)
             GroupedCard {
-                // 三项单独同意（语音大模型 / 视力与导盲犬 / 陪跑位置）的撤回放在一处（#393）。
+                // 单独同意（视力与导盲犬 / 陪跑位置）的撤回放在一处（#393；语音下单 2026-11-23 下线后去掉了那一项）。
                 NavigationLink {
                     PrivacyAuthorizationView()
                 } label: {
@@ -88,7 +88,7 @@ struct BlindAccountView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(PrivacyAuthorizationCopy.title)
-                .accessibilityHint("查看并撤回语音下单、视力状况和陪跑位置共享这三项同意")
+                .accessibilityHint("查看并撤回视力状况和陪跑位置共享这两项同意")
                 .accessibilityIdentifier("blindPrivacyAuthorizationSettingsEntry")
 
                 GroupedCardDivider()

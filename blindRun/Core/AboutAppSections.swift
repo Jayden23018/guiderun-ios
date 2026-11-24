@@ -42,12 +42,6 @@ enum AppFilingDisclosure {
     static let filingQueryURL = URL(string: "https://beian.miit.gov.cn/")! // guard:allow server-addr 工信部备案查询页，用浏览器打开，不是 API
     static let filingQueryLabel = "工信部备案查询网站 beian.miit.gov.cn"
     static let filingQueryTitle = "工信部备案查询"
-
-    /// 国家网信办 2026-05-13 公告要求公示模型名称和备案号。
-    /// 后端换模型或换厂商（`app.voice.llm.model`）时这里要一起改。
-    /// 同一家的 `网信算备…` 是算法备案号，不是大模型备案号。
-    static let voiceOrderModelName = "通义千问大模型"
-    static let voiceOrderModelFilingNumber = "ZheJiang-TongYiQianWen-20230901"
 }
 
 // MARK: - Sections
@@ -144,31 +138,11 @@ struct AppFilingSection: View {
     }
 }
 
-struct GenerativeModelDisclosureSection: View {
-    var body: some View {
-        Section {
-            DisclosureValueRow(
-                title: "语音下单使用的大模型",
-                value: AppFilingDisclosure.voiceOrderModelName,
-                layout: .inline
-            )
-                .accessibilityIdentifier("aboutVoiceOrderModelName")
-            DisclosureValueRow(
-                title: "大模型备案号",
-                value: AppFilingDisclosure.voiceOrderModelFilingNumber,
-                spellsOutValue: true
-            )
-            .accessibilityIdentifier("aboutVoiceOrderModelFilingNumber")
-        } header: {
-            Text("大模型公示")
-                .foregroundColor(AppColors.textSecondary)
-                .accessibilityAddTraits(.isHeader)
-        }
-    }
-}
+// 「大模型公示」一组 2026-11-25 删掉：语音下单 11-23 永久下线，App 不再调用大模型，
+// App Store Connect 合规页「人工智能生成或合成内容」答了「否」（OpenSpec remove-voice-order-model-disclosure）。
 
 /// 公示的一行，两种排法（定稿 #755）：
-/// - `.stacked`：名在上、值在下。长的值（地图审图号、大模型备案号）用它，大字号下也不截短。
+/// - `.stacked`：名在上、值在下。长的值（地图审图号）用它，大字号下也不截短。
 /// - `.inline`：名在左、值在右；大字号下改上下排（`AdaptiveHStack`），值照样换行不截短。
 ///
 /// 不用 `LabeledContent`：备案号很长，左右排列时大字号下会被挤成多行窄条。

@@ -85,7 +85,7 @@ enum PrivacyConsentPurpose: String, CaseIterable, Sendable {
     /// （`CURRENT_PROJECT_VERSION` 至今为 1，没有上传过 TestFlight），所以回退零影响。
     var disclosureVersion: Int {
         switch self {
-        case .appLaunch: return 4
+        case .appLaunch: return 5
         case .volunteerIdentity: return 1
         case .blindVisionProfile: return 1
         case .voiceOrderThirdPartyLLM: return 1
@@ -120,10 +120,11 @@ enum PrivacyConsentPurpose: String, CaseIterable, Sendable {
                 // 不是新收集、换用途、换接收方或改保留规则；同 `volunteerLocationTrack` 那条「实际收集比原文说的少」的先例。
                 "登录用你的手机号。志愿者接单前要先实名认证，会收集姓名和身份证号，还要提供证件照并做一次人脸核验。",
                 "陪跑服务进行中会持续获取你的位置，用来把双方位置显示给对方、记录这次的路线；锁屏后仍在定位。",
-                // 2026-10-10 补上第三方大模型（#374）。**+1 `disclosureVersion`（3 → 4）**：新的接收方 ——
-                // 此前只说「只用于识别这一单」，而转写文字实际由后端交给阿里云通义千问理解
-                // （后端隐私政策 v1.2 写了，App 内没写）。#365 刚把版本升到 3 且未发布，这里在它基础上再升一档。
-                "语音下单会录下你说的话并转成文字，再发给阿里云通义千问（第三方大模型）理解，只用于识别此订单的内容。第一次用语音下单之前会单独问你，不同意可以改用手动填写。",
+                // 2026-11-25 语音下单那条换成语音输入（OpenSpec remove-voice-order-model-disclosure）。
+                // **+1 `disclosureVersion`（4 → 5）**：语音下单 11-23 永久下线，通义千问不再是接收方；
+                // 同时新披露一个接收方 —— 语音输入（`VoiceDictationButton`）走苹果的语音识别，
+                // `SpeechInputService` 没设 `requiresOnDeviceRecognition`，音频会发到苹果的服务器，这件事此前没写。
+                "在输入框旁点语音输入时（例如搜索地点、填补充说明、写留言或反馈），你说的话会经苹果的语音识别转成文字，再填进输入框，和你打字输入的一样处理。不想用语音，也可以直接打字。",
                 // 2026-09-30 加入运动数据（后端隐私政策 v1.2 §2.5）。**这次 +1 `disclosureVersion`**：
                 // 新收集一类信息（步数 / 步频 / 爬升高度，跑后运动记录 #189 起随位置上传），
                 // 旧同意没有覆盖到 —— 与 09-10 那次「换分类说法」性质相反。独立一条是为了
@@ -289,7 +290,7 @@ enum PrivacyConsentPurpose: String, CaseIterable, Sendable {
         switch self {
         case .appLaunch:
             return "助盲跑会收集你的手机号、位置、语音和运动数据；志愿者实名认证时还会收集身份证号并做人脸核验。"
-                + "地图、定位和地址搜索由高德开放平台 SDK 提供，语音下单的文字会发给阿里云通义千问理解。"
+                + "地图、定位和地址搜索由高德开放平台 SDK 提供，语音输入由苹果的语音识别转成文字。"
                 + "这些信息只用于陪跑服务，不做广告、不出售给任何人。"
                 + "身份证号、人脸、位置轨迹和视力状况属于敏感个人信息，收集前会再单独问你。"
         case .volunteerIdentity, .blindVisionProfile, .voiceOrderThirdPartyLLM,

@@ -265,27 +265,27 @@ final class PrivacyConsentTests: XCTestCase {
         XCTAssertTrue(LegalFallbackCopy.document(for: .userAgreement).sections.allSatisfy { $0.links.isEmpty })
     }
 
-    /// #374：语音下单的转写文字会交给第三方大模型，这件事必须在三处都点名 ——
-    /// 首启告知（含首屏摘要）、内置隐私政策、语音下单前的单独同意页。少一处，
-    /// 用户在那一处读到的就是「只用于识别此订单」，而没有说它会被交给谁。
-    func testEveryPlaceThatDescribesVoiceOrderingNamesTheThirdPartyLLM() throws {
+    /// 语音下单 2026-11-23 永久下线（OpenSpec remove-voice-order-model-disclosure）。#374 原本要求三处都点名
+    /// 通义千问；现在首启告知、首屏摘要、内置隐私政策都**不许**再提它，否则就是告诉用户一个不存在的接收方。
+    /// 语音听写仍在用（搜索地点、补充说明、留言、反馈、举报），它走苹果的语音识别 —— 这件事首启告知和内置隐私政策都要说。
+    /// 语音下单单独同意页的文案留着（代码还在、入口已删），这里不再管它。
+    func testLaunchNoticeAndPolicyDescribeDictationAndNoLongerNameTheLLM() throws {
         let launch = PrivacyConsentPurpose.appLaunch.disclosures
-        let voiceLine = try XCTUnwrap(launch.first { $0.hasPrefix("语音下单会录下你说的话") })
-        XCTAssertTrue(voiceLine.contains("通义千问") && voiceLine.contains("第三方大模型"), voiceLine)
-        XCTAssertTrue(voiceLine.contains("手动填写"), "告知里要说清不同意还有路可走")
-        XCTAssertTrue(try XCTUnwrap(PrivacyConsentPurpose.appLaunch.launchSummary).contains("通义千问"))
+        XCTAssertFalse(launch.joined().contains("通义千问"), "首启告知还在提通义千问")
+        XCTAssertFalse(launch.joined().contains("语音下单"), "首启告知还在提语音下单")
+        let dictation = try XCTUnwrap(launch.first { $0.hasPrefix("在输入框旁点语音输入时") })
+        XCTAssertTrue(dictation.contains("苹果的语音识别") && dictation.contains("直接打字"), dictation)
+        let summary = try XCTUnwrap(PrivacyConsentPurpose.appLaunch.launchSummary)
+        XCTAssertFalse(summary.contains("通义千问"), summary)
+        XCTAssertTrue(summary.contains("苹果的语音识别"), summary)
 
         let policy = LegalFallbackCopy.document(for: .privacyPolicy)
+        let allPolicyText = policy.sections.flatMap(\.bullets).joined()
+        XCTAssertFalse(allPolicyText.contains("通义千问"), "内置隐私政策还在提通义千问")
+        XCTAssertFalse(allPolicyText.contains("语音下单"), "内置隐私政策还在提语音下单")
         let collected = try XCTUnwrap(policy.sections.first { $0.heading == "我们收集的信息" })
         let microphone = try XCTUnwrap(collected.bullets.first { $0.hasPrefix("麦克风与语音内容") })
-        XCTAssertTrue(microphone.contains("通义千问"), microphone)
-        let sdk = try XCTUnwrap(policy.sections.first { $0.heading == "第三方 SDK" })
-        XCTAssertTrue(sdk.bullets.contains { $0.contains("通义千问") }, "「第三方 SDK」一节没提通义千问")
-
-        let consent = PrivacyConsentPurpose.voiceOrderThirdPartyLLM.disclosures.joined()
-        for keyword in ["转成文字", "阿里云通义千问", "第三方大模型", "手动填写"] {
-            XCTAssertTrue(consent.contains(keyword), "语音下单同意页漏了「\(keyword)」")
-        }
+        XCTAssertTrue(microphone.contains("苹果的语音识别"), microphone)
     }
 
     /// 拒绝是一个完整的答案：只确认没用、并指向真能走的路；不劝返（GB/T 41819-2022 的反面做法）。
@@ -336,7 +336,10 @@ final class PrivacyConsentTests: XCTestCase {
             // blindVisionProfile、blindLocationTrack、volunteerLocationTrack 三行，判断相同。
             // 2026-11-05 指纹变了而版本号不动（#767）：视障跑者不再实名，第 1 条改成只有志愿者实名。
             // 只是少收集（视障跑者不再交姓名和身份证号），不是新收集、换用途、换接收方或改保留规则。
-            .appLaunch: (4, 976_468_007),
+            // 2026-11-25 指纹变了**且版本号 4 → 5**，「行为变了」那一档（OpenSpec remove-voice-order-model-disclosure）：
+            // 语音下单下线，通义千问不再是接收方；同时新披露苹果的语音识别（语音输入的音频经苹果服务器转文字）。
+            // App 还没上架，+1 只让 TestFlight 测试员重新同意一次。
+            .appLaunch: (5, 999_469_758),
             // 2026-09-10 指纹又变了而版本号仍不动，同样是**有意的**：
             // 第 4 条里把「视力状况」加进敏感信息那一句。这两个字段的收集、用途、接收方、
             // 保留规则一个字节都没改（iOS 侧此前压根没有采集入口，值来自后端建档默认值），

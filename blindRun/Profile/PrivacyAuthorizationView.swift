@@ -2,7 +2,10 @@ import SwiftUI
 
 // MARK: - 隐私与授权（#393，#754 拆两层）
 
-/// 盲人端三项单独同意的撤回，放在同一处、同一种交互（PIPL 第十五条：同意要能撤回，撤回要和给出一样便捷）。
+/// 盲人端单独同意的撤回，放在同一处、同一种交互（PIPL 第十五条：同意要能撤回，撤回要和给出一样便捷）。
+///
+/// 2026-11-25 起第一层只列两项（视力、位置）：语音下单 11-23 永久下线，入口已删，那一行一起去掉
+/// （OpenSpec remove-voice-order-model-disclosure）。`voice*` 文案和 `PrivacyVoiceConsentDetailView` 留着，等决定删不删语音下单代码时一起处理。
 ///
 /// #754 起照设置 App「隐私与安全」拆两层：第一层只看状态，每项点进去一页，在那一页撤回。
 /// 第一层没有撤回按钮，误触撤回的机会少了；撤回结果留在撤回行下面并朗读一次。
@@ -14,7 +17,7 @@ enum PrivacyAuthorizationCopy {
     static let granted = "当前：已同意。"
 
     // 第一层
-    static let intro = "你同意过的三件事。点进去看用途，也可以撤回。"
+    static let intro = "你同意过的两件事。点进去看用途，也可以撤回。"
     static let listFootnote = "撤回后，下次要用到时会重新问你。"
     static let grantedValue = "已同意"
     static let notGrantedValue = "没有同意"
@@ -100,14 +103,14 @@ enum PrivacyConsentIcon {
     static let location = (systemImage: "location.fill", rgb: AppColors.voiceStageSurfaceTone.light)
 }
 
-/// 第一层：说明卡 + 三行（名称、灰字状态、箭头）。撤回在每项的详情页（`PrivacyConsentDetailView.swift`）。
+/// 第一层：说明卡 + 两行（名称、灰字状态、箭头）。撤回在每项的详情页（`PrivacyConsentDetailView.swift`）。
 struct PrivacyAuthorizationView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var speechService: SpeechService
     /// 视力那项复用资料页的撤回（整表单保存，两项发 `NOT_SPECIFIED`，保存成功才删同意记录）。
     /// 放在第一层持有、传给详情页：返回列表再进去，撤回待保存与失败那句都还在。
     @StateObject private var profileViewModel = BlindRunnerProfileViewModel()
-    /// `hasVoiceOrderConsent` / `hasLocationTrackConsent` 是现读的计算属性，SwiftUI 收不到通知。
+    /// `hasLocationTrackConsent` 是现读的计算属性，SwiftUI 收不到通知。
     /// 从详情页返回时自增一次让列表重读 —— 只读它、不拿它当 `.id`：换 id 会重建整页，读屏焦点跳回页首。
     @State private var refreshTick = 0
     /// `configure` 只做一次：再调会用资料覆盖表单，撤回待保存时重试就会把旧的视力取值发回去。
@@ -120,8 +123,6 @@ struct PrivacyAuthorizationView: View {
                 PrivacyAuthorizationIntroCard()
                 VStack(alignment: .leading, spacing: 8) {
                     GroupedCard {
-                        voiceRow
-                        GroupedCardDivider(leadingInset: PrivacyConsentListRowLabel.dividerInset)
                         visionRow
                         GroupedCardDivider(leadingInset: PrivacyConsentListRowLabel.dividerInset)
                         locationRow
@@ -148,18 +149,7 @@ struct PrivacyAuthorizationView: View {
         }
     }
 
-    // MARK: 三行
-
-    private var voiceRow: some View {
-        listRow(
-            title: PrivacyAuthorizationCopy.voiceTitle,
-            status: appState.hasVoiceOrderConsent ? PrivacyAuthorizationCopy.grantedValue : PrivacyAuthorizationCopy.notGrantedValue,
-            icon: PrivacyConsentIcon.voice,
-            identifier: "privacyVoiceOrderConsentEntry"
-        ) {
-            PrivacyVoiceConsentDetailView()
-        }
-    }
+    // MARK: 两行
 
     private var visionRow: some View {
         let row = VisionRevokeRow.resolve(
