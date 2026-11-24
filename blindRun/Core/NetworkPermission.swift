@@ -28,7 +28,7 @@ enum NetworkPermission {
         previous == .restricted && current == .notRestricted
     }
 
-    static let message = "还没有联网权限。请在弹窗里选择允许助盲跑使用网络，允许后会自动重试。"
+    static let message = "还没有联网权限。请在弹窗里选择允许助盲跑使用网络。弹窗已经关掉的话，到系统设置里打开助盲跑的无线数据。允许后再试一次。"
 
     /// 当前授权状态，供 `APIError` 取文案用。回调在任意队列，所以加锁。
     static var currentState: CTCellularDataRestrictedState { monitor.state }
