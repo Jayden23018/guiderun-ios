@@ -5,6 +5,7 @@
 //  宕机、网关报错、连不上服务器时单独说清（#659，审计 F-7）。写法照 `APIError+SecureConnection.swift`。
 //
 
+import CoreTelephony
 import Foundation
 
 extension APIError {
@@ -38,8 +39,15 @@ extension APIError {
         return .offline
     }
 
-    static func networkFailureMessage(_ error: Error) -> String {
-        switch networkFailureKind(error) {
+    static func networkFailureMessage(
+        _ error: Error,
+        permission: CTCellularDataRestrictedState = NetworkPermission.currentState
+    ) -> String {
+        let kind = networkFailureKind(error)
+        if NetworkPermission.isAwaitingPermission(state: permission, failure: kind) {
+            return NetworkPermission.message // 联网授权还没给（#1008）
+        }
+        switch kind {
         case .secureConnection: return secureConnectionMessage
         case .offline: return offlineMessage
         case .serverUnreachable: return serverUnavailableMessage

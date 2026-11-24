@@ -36,3 +36,24 @@ extension AppState {
         }
     }
 }
+
+extension AppState {
+    /// 开始监听联网授权。`restoreSession` 开头调；监听内部只启动一次，重复调用无害。
+    func startNetworkPermissionRetry() {
+        NetworkPermission.startMonitoring { [weak self] in
+            Task { await self?.retryLaunchRequestsAfterNetworkPermission() }
+        }
+    }
+
+    /// 用户在系统弹窗里点了「允许联网」后，重做启动时因没有授权而失败的请求（#1008）。
+    func retryLaunchRequestsAfterNetworkPermission() async {
+        if case .validationFailed = sessionRestorationState {
+            await restoreSession()
+        }
+        if legalLinks == nil {
+            didAttemptLegalLinksLoad = false
+            await loadLegalLinksIfNeeded()
+        }
+        await loadFeatureFlagsIfNeeded()
+    }
+}

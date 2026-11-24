@@ -1,3 +1,4 @@
+import CoreTelephony
 import XCTest
 @testable import blindRun
 
@@ -71,5 +72,41 @@ final class ServerUnavailableErrorCopyTests: XCTestCase {
             }
         }
         XCTAssertTrue(EmergencySafetyCopy.failure(APIError.unknown(statusCode: 503).reasonClause).contains("服务暂时出了问题"))
+    }
+}
+
+/// 联网授权没给时不说「网络连接失败」，给了之后才重试（#1008）。
+///
+/// **验红方式**：把 `isAwaitingPermission` 改成恒返回 false，或把 `shouldRetry` 改成恒返回 true，
+/// 对应用例必须失败。
+final class NetworkPermissionTests: XCTestCase {
+    func testRestrictedOfflineFailureIsAwaitingPermission() {
+        XCTAssertTrue(NetworkPermission.isAwaitingPermission(state: .restricted, failure: .offline))
+    }
+
+    func testOtherStatesOrFailuresAreNotAwaitingPermission() {
+        XCTAssertFalse(NetworkPermission.isAwaitingPermission(state: .notRestricted, failure: .offline))
+        XCTAssertFalse(NetworkPermission.isAwaitingPermission(state: .restrictedStateUnknown, failure: .offline))
+        for kind in [APIError.NetworkFailureKind.serverUnreachable, .ambiguous, .secureConnection] {
+            XCTAssertFalse(NetworkPermission.isAwaitingPermission(state: .restricted, failure: kind), "\(kind)")
+        }
+    }
+
+    func testMessageReplacesOfflineCopyOnlyWhileRestricted() {
+        let blocked = APIError.networkFailureMessage(URLError(.notConnectedToInternet), permission: .restricted)
+        XCTAssertEqual(blocked, NetworkPermission.message)
+        XCTAssertFalse(blocked.contains("网络连接失败"))
+        XCTAssertEqual(
+            APIError.networkFailureMessage(URLError(.notConnectedToInternet), permission: .notRestricted),
+            APIError.offlineMessage
+        )
+    }
+
+    func testRetriesOnlyWhenRestrictionLifts() {
+        XCTAssertTrue(NetworkPermission.shouldRetry(previous: .restricted, current: .notRestricted))
+        XCTAssertFalse(NetworkPermission.shouldRetry(previous: nil, current: .notRestricted))
+        XCTAssertFalse(NetworkPermission.shouldRetry(previous: .notRestricted, current: .notRestricted))
+        XCTAssertFalse(NetworkPermission.shouldRetry(previous: .restricted, current: .restricted))
+        XCTAssertFalse(NetworkPermission.shouldRetry(previous: .restrictedStateUnknown, current: .notRestricted))
     }
 }
