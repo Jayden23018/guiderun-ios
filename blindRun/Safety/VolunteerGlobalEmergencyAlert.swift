@@ -41,7 +41,15 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
                     peer = nil
                     return
                 }
-                peer = VolunteerEmergencyAlertPeer.make(from: try? await appState.orders.orderDetail(orderId: orderID))
+                // 拿不到就再试几次：警报上的「打电话」靠它，网络差时一次失败不能让按钮一直缺席。
+                for attempt in 0..<3 {
+                    if let detail = try? await appState.orders.orderDetail(orderId: orderID) {
+                        peer = VolunteerEmergencyAlertPeer.make(from: detail)
+                        return
+                    }
+                    if attempt < 2 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
+                    if Task.isCancelled { return }
+                }
             }
     }
 
