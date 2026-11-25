@@ -11,9 +11,9 @@
 | 项 | 状态 |
 |---|---|
 | 审核专用账号（盲人 + 陪跑员各一） | ✅ 后端已建好（[blind-run-backend#454](https://github.com/Jayden23018/blind-run-backend/issues/454) 2026-09-30 答复；[#641](https://github.com/Jayden23018/blind-run-backend/issues/641) 2026-10-15 核对，生产固定验证码名单只剩这一对）。号码与验证码**只填进 ASC 的 Sign-in 字段，不写进本仓库**（公开仓库），原文去 #454 看。要点见 §2.3 |
-| 录屏链接 | ⏳ 按 §3 录完上传后替换 §2.2 里的 `<VIDEO_URL>` |
+| 录屏链接 | ⏳ 2026-11-26 送审版（构建 945）没放录屏，§2.2 也去掉了 `VIDEO` 一行。录好后在第一段后面加回 `VIDEO of the full two-device flow: <链接>`，并删掉 "The app is free, with no in-app purchases or ads." 一句：§2.2 现在填好号码后是 3978 字节，不删会超 4000 |
 | 联系人姓名 / 电话 / 邮箱、Feedback Email | ⏳ 负责人定 |
-| 时区问题 | 🟡 代码已修（formatter 固定按 `Asia/Shanghai` 生成与解析，见 §4 第 1 条，跟踪 [#236](https://github.com/Jayden23018/blind-run-ios/issues/236)），**但要等含该修复的构建上传后才对审核员生效**。在那之前，§2.2 里「把设备时区切到北京」那一段**仍要保留**；新构建上传并验过后可删 |
+| 时区问题 | ✅ 代码已修（formatter 固定按 `Asia/Shanghai` 生成与解析，见 §4 第 1 条，跟踪 [#236](https://github.com/Jayden23018/blind-run-ios/issues/236)，修复提交 `fb10c7e7`）。送审构建 945（`916b6abf`）已含该提交，所以 2026-11-26 从 §2.2 删掉了「把设备时区切到上海」那一步 |
 | 开跑同意闸 | 🟡 跑者端汇合屏已加「开始跑步」（feat/blind-start-run-button，2026-10-06），§2.2 第 6 步与 §3 已按新流程改写、不再等「开跑 + 15 分钟」。**只对含这个改动的构建成立**：上传前确认构建号晚于它合并的那次提交，否则审核员按新步骤会被 409 拦住 |
 | iPad | 已定只支持 iPhone（2026-09-30，`TARGETED_DEVICE_FAMILY = 1`）。备注没提 iPad，不用改 |
 
@@ -75,7 +75,7 @@ To report a problem, just reply to the invitation email.
 | Sign-in required | 勾选 |
 | User name | 审核跑者账号的手机号（§2.3） |
 | Password | 固定验证码（§2.3） |
-| Review Notes | §2.2 整段。Apple 帮助页写的上限是 4000 **字节**（UTF-8），不是字符；中文按 3 字节计。换掉 `<VIDEO_URL>` 后仍要在 4000 字节以内 |
+| Review Notes | §2.2 整段。Apple 帮助页写的上限是 4000 **字节**（UTF-8），不是字符；中文按 3 字节计。把 `<VOLUNTEER_PHONE>` 换成号码后是 3978 字节（2026-11-26 算），改一个字都要重算 |
 | Contact | ⏳ |
 
 ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号。陪跑员账号写进备注：Apple 帮助页
@@ -85,9 +85,7 @@ ASC 的 Sign-in 字段只有一组用户名 + 密码，所以填**跑者**账号
 ### 2.2 Review Notes（英文，填进 ASC）
 
 ```text
-GuideRun (助盲跑, UI in Simplified Chinese) matches blind and low-vision runners with volunteer running guides. The core flow needs TWO accounts on TWO iPhones: a Runner (books a run) and a Volunteer (accepts it).
-
-VIDEO of the full two-device flow: <VIDEO_URL>
+GuideRun (助盲跑, UI in Simplified Chinese) matches blind and low-vision runners with volunteer running guides. The core flow needs TWO accounts on TWO iPhones: a Runner (books a run) and a Volunteer (accepts it). With only the Runner signed in, a booking waits and then ends with "no guide found"; this is expected. Bookings from the review accounts go only to the review Volunteer, never to real users. The app is free, with no in-app purchases or ads.
 
 SIGN IN
 Runner device: use the phone number and fixed code from the Sign-in field. Volunteer device: phone <VOLUNTEER_PHONE>, same fixed code. Enter the number, tap the button to get a code, then enter the code. No SMS is sent to these test numbers. Both accounts are already verified; no ID or face check will be asked. The review accounts are not limited to our launch city (Shenzhen) or to our service hours.
@@ -95,7 +93,6 @@ Runner device: use the phone number and fixed code from the Sign-in field. Volun
 BEFORE YOU START (both devices)
 1. Runs cannot overlap 22:00-05:00 China time, which is 06:00-13:00 US Pacific Standard Time. Please book a start time after 13:30 PST.
 2. Allow Location on both devices. Keep the two devices within 5 km of each other.
-3. If a booking is rejected as "in the past", set the time zone to Shanghai, China: Settings > General > Date & Time.
 
 STEPS (about 25 minutes, mostly waiting)
 1. Volunteer device: sign in, swipe the slider "向右滑动，我现在有空陪跑" to the right, keep the app open in the foreground.
@@ -149,7 +146,7 @@ The help (SOS) button only sends an alert while a run is in progress. The alert 
 | 项 | A = 陪跑员手机 | B = 跑者手机 |
 |---|---|---|
 | 账号 | 审核陪跑员账号（§2.3） | 审核跑者账号（§2.3） |
-| 时区 | 设成上海（和审核备注要求一致，顺便验证这个写法走得通） | 同左 |
+| 时区 | 不用改（构建 945 起按北京时间提交，审核备注已不要求切时区） | 同左 |
 | 定位 | 允许；两台手机放在一起 | 同左 |
 | 屏幕录制 | 控制中心开录屏，**关麦克风**（避免录进周围人声） | 同左 |
 | 账号状态 | 没有进行中的单 | 没有未完成的单（最多 3 张，且时段冲突会被拒） |
@@ -181,7 +178,7 @@ The help (SOS) button only sends an alert while a run is in progress. The alert 
 
 ### 3.3 拍完
 
-- 两段录屏按上表顺序剪成一个视频，**时长控制在 5 分钟内**，上传到审核员打开链接就能看、不用登录的位置，把链接填进 §2.2 的 `<VIDEO_URL>`
+- 两段录屏按上表顺序剪成一个视频，**时长控制在 5 分钟内**，上传到审核员打开链接就能看、不用登录的位置，按 §0「录屏链接」那一行加回 §2.2
 - 回看一遍：画面里有没有露出真实手机号（通话磨合页会显示号码）、有没有露出紧急联系人信息。露了就打码
 
 ## 4. 起草时核实过的事实
