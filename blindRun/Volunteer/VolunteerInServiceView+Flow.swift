@@ -144,14 +144,15 @@ extension VolunteerInServiceView {
         )
     }
 
-    /// 快捷回复只在出发中显示（汇合页的动作是响铃和打电话）。
+    /// 快捷回复：出发中给两条；已到达只给「再等我 5 分钟」（#1012）。后端两态都放行，
+    /// 但人已经到了再说「我快到了」是错话，所以到达后只留后一条。汇合页的主动作仍是响铃和打电话。
     private func quickReplies(
         order: OrderDetailResponse,
         phase: VolunteerOrderPhase,
         now: Date
     ) -> VolunteerOrderQuickReplies? {
-        guard case .departed = phase else { return nil }
-        let codes: [QuickMessageCode] = [.almostThere, .waitFiveMinutes]
+        let codes = phase.quickMessageCodes
+        guard !codes.isEmpty else { return nil }
         return VolunteerOrderQuickReplies(
             runnerName: order.blindName?.nilIfBlank ?? VolunteerOrderFlowCopy.unknownRunnerName,
             items: codes.map { code in

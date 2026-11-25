@@ -102,6 +102,8 @@ struct VolunteerTabView: View {
             .tag(Tab.profile)
         }
         .tint(AppColors.Flow.tabSelected)
+        // #1012：跑者按求助时，陪跑员在哪一页都要看到全屏警报（此前只挂在订单页）。
+        .volunteerGlobalEmergencyAlert(coordinator: appState.emergencyCoordinator)
         // 🔴 **导航触发时先切回首页 tab。** 三个落点（通话磨合 / 已接下的单 / 接单主页）的
         // `navigationDestination` 都在首页 tab 的栈里 —— 人在「记录」或「我的」上时
         // push 照常发生，而他**看不见**：屏幕上什么都没变，通话窗口却在走。

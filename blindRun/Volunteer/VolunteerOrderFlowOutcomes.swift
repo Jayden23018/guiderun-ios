@@ -41,6 +41,20 @@ extension VolunteerOrderFlowPresentation {
             )
         )
 
+        if let message = VolunteerRunnerMessage.row(order: order) { rows.append(message) }
+        // 已到达也能退出（#1012）：产品定了陪跑员任何阶段可取消，跑步中（#962）才不给。画在顶栏「···」里。
+        rows.append(
+            Row(
+                id: "release",
+                label: nil,
+                value: VolunteerOrderFlowCopy.releaseOrder,
+                detail: nil,
+                action: .releaseOrder,
+                accessibilityLabel: VolunteerOrderFlowCopy.releaseOrder,
+                accessibilityHint: "双击后会先确认一次。此订单将转给其他陪跑员"
+            )
+        )
+
         let title = peerDistanceText.map {
             VolunteerOrderFlowCopy.metUpTitle(name: name, distance: $0)
         } ?? VolunteerOrderFlowCopy.metUpStaleTitle(name: name)

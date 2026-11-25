@@ -286,9 +286,7 @@ enum VolunteerOrderFlowCopy {
             lateNotice: isLate
                 ? "离开始不到 \(lateCancelWindowHours) 小时。现在取消会记一次临时取消，系统会马上为跑者重新找人。"
                 : nil,
-            message: status == .scheduledConfirmed || status == .pendingAccept || status == .driverEnRoute
-                ? "此订单将转给其他陪跑员，之后不一定还能接回来。"
-                : "此订单将转给其他陪跑员。",
+            message: cancelMessage(for: status),
             keep: "保留这次陪跑",
             cancel: "仍然取消"
         )
@@ -732,8 +730,7 @@ struct VolunteerOrderFlowPresentation: Equatable {
         }
         guard step == .booked || step == .departed else { return nil }
 
-        var rows: [Row] = [runnerRow(order: order)]
-        if let phoneRow = phoneRow(order: order) { rows.append(phoneRow) }
+        var rows = runnerPhoneAndMessageRows(order: order)
 
         if order.status.disclosesBlindRunnerNotesToVolunteer {
             // 🔴 标签保留 `路线备注` / `特殊说明`，**不按设计稿合并成「引导习惯」**。
@@ -880,7 +877,7 @@ struct VolunteerOrderFlowPresentation: Equatable {
     /// 姓名**视觉上保留掩码**（`李*`）、**朗读去掉星号** —— 后端的姓名始终带掩码
     /// （契约逐字「不存在明文版本」），原样交给 VoiceOver 会念成「李星号」，
     /// 而陪跑员端的读屏同样是外放的。设计稿写的「接下后显示李明的全名」做不到。
-    private static func runnerRow(order: OrderDetailResponse) -> Row {
+    static func runnerRow(order: OrderDetailResponse) -> Row {
         let name = order.blindName?.nilIfBlank ?? VolunteerOrderFlowCopy.unknownRunnerName
         let needs = order.escortNeeds.map(\.value).joined(separator: "，").nilIfBlank
         return Row(
