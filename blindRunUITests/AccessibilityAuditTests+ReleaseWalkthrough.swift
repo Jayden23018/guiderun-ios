@@ -69,7 +69,8 @@ extension AccessibilityAuditTests {
     // MARK: - #1022 跑步途中陪跑员退出 → 重新匹配页
 
     @MainActor
-    func testWalk_MidRunDepartureRematchPage() {
+    func testWalk_MidRunDepartureRematchPage() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("performAccessibilityAudit 需要 iOS 17+ 运行时") }
         let app = walkthroughLaunchBlind(seed: "DRIVER_ARRIVED", env: ["AIDRUN_UI_TEST_VOLUNTEER_LOST_AFTER_SECONDS": "12"])
         _ = walkthroughTapIfAppears(app, "blindRunnerHomeOrderCard", timeout: 15)
         let title = app.staticTexts["陪跑员已退出"].firstMatch
@@ -83,11 +84,8 @@ extension AccessibilityAuditTests {
             banner.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: banner.frame.width - 46, dy: 48)).tap()
             sleep(2)
         }
-        XCTExpectFailure("#1028：订单页上横幅点「关闭」后不消失（ContentView 没订阅 realtimeCoordinator）", strict: false) {
-            XCTAssertFalse(banner.exists, "通知横幅关不掉")
-        }
-        // 不审计：横幅关不掉时盖在头卡上，审计只会点名横幅底下的字（#1024 两轮真机都是「关闭」「求助」「匹配中」三条）。
-        // #1028 修好后去掉上面的 XCTExpectFailure，再在这里补 `try audit(app)`。
+        XCTAssertFalse(banner.exists, "通知横幅关不掉（#1028）")
+        try audit(app)
     }
 
     // MARK: - #1020 闸开着：陪跑员请求结束，跑者确认安全

@@ -39,3 +39,28 @@ struct RealtimeForegroundNotificationBanner: View {
         .accessibilityIdentifier("realtimeForegroundNotification")
     }
 }
+
+/// 前台通知横幅挂在根视图上的那一层。**用 `@ObservedObject` 自己持有协调器**（#1028）：
+/// 协调器挂在 `AppState` 上，嵌套的 ObservableObject 不会经 `AppState` 重新发布。原来横幅直接写在 `ContentView` 里，
+/// 出现时靠播报改动 `SpeechService` 顺带重画才看得见；点「关闭」或 5 秒到点变成 nil 时没有任何东西让它重画，
+/// 订单页上横幅就一直挂着（真机：到点 12 秒后仍在，转一下屏才消失）。
+struct RealtimeForegroundNotificationOverlay: View {
+    @ObservedObject var coordinator: AppRealtimeCoordinator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if let notification = coordinator.currentNotification {
+            RealtimeForegroundNotificationBanner(
+                notification: notification,
+                onDismiss: { coordinator.dismissCurrentNotification() }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            // 「减弱动态效果」开启时只淡入淡出，不从屏幕顶端滑进来。
+            // 这条横幅是主动弹出的（不是用户操作触发），突然的位移最容易引起不适；
+            // 淡入保留了「有新东西出现」这个提示本身。
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            .zIndex(100)
+        }
+    }
+}
