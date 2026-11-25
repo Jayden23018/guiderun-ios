@@ -538,7 +538,7 @@ struct OrderDetailResponse: Codable, Identifiable, Sendable {
     /// 陪跑员最早可以单方面结束的时刻。只下发给本单陪跑员。
     @LenientOptionalString var unilateralFinishOpensAt: String? = nil
     /// 完成后跑者的求助还挂在这一单上、走云端的截止时刻。只在 `COMPLETED` 下发给本单跑者。
-    @LenientOptionalString var postFinishSosUntil: String? = nil
+    @LenientOptionalString var sosWindowEndsAt: String? = nil
 
     var id: Int64 { orderId }
 
@@ -618,7 +618,7 @@ struct OrderDetailResponse: Codable, Identifiable, Sendable {
             // 同一条理由：漏掉会让举报入口在每次状态推送后静默消失。
             counterpartUserId: counterpartUserId,
             // 同一条理由：漏掉会让跑者的确认按钮、陪跑员的单方面结束时刻在每次状态推送后消失。
-            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, postFinishSosUntil: postFinishSosUntil
+            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, sosWindowEndsAt: sosWindowEndsAt
         )
     }
 }

@@ -5,9 +5,9 @@ import Foundation
 // - 闸关着（`finishBlindConfirmTimeout == 0`，默认，与线上一致）：`finish` 调用即完成，与改动前一样。
 // - 闸开着：第一次 `finish` 只记请求、回 `completed=false`；到 `unilateralFinishOpensAt` 之前再调回 409
 //   `BLIND_SAFETY_CONFIRMATION_PENDING`；之后再调即完成。`confirm-safe` 即完成。请求在 2 × 超时后作废。
-// - 完成后给跑者一个求助窗口 `postFinishSosUntil`（后端默认 30 分钟）。
+// - 完成后给跑者一个求助窗口 `sosWindowEndsAt`（后端默认 30 分钟）。
 //
-// 时刻按查看者下发：`unilateralFinishOpensAt` 只给陪跑员，`postFinishSosUntil` 只给跑者（记忆 `mock-fabricates-fields-the-backend-never-sends`）。
+// 时刻按查看者下发：`unilateralFinishOpensAt` 只给陪跑员，`sosWindowEndsAt` 只给跑者（记忆 `mock-fabricates-fields-the-backend-never-sends`）。
 extension MockAPIClient {
     /// 打开 Mock 的确认闸：值是确认超时的**秒数**（后端配的是分钟；Mock 用秒，好让单方面结束在开发期等得到）。
     static let finishBlindConfirmTimeoutEnvironmentKey = "AIDRUN_MOCK_FINISH_BLIND_CONFIRM_SECONDS"
@@ -108,7 +108,7 @@ extension MockAPIClient {
         _ = try handleFinish(orderId: orderId)
         finishRequestTimes[orderId] = nil
         if let index = orders.firstIndex(where: { $0.orderId == orderId }), mockRole == .blind {
-            orders[index].postFinishSosUntil = Self.stamp(now.addingTimeInterval(Self.postFinishSOSWindow))
+            orders[index].sosWindowEndsAt = Self.stamp(now.addingTimeInterval(Self.postFinishSOSWindow))
         }
         return FinishOrderResponse(completed: true)
     }

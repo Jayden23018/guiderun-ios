@@ -51,9 +51,9 @@ extension OrderDetailResponse {
         return unilateralFinishOpensAt?.nilIfBlank?.backendTimestamp
     }
 
-    /// 完成后、`postFinishSosUntil` 之前：跑者的求助仍挂在这一单上走云端（契约：「iOS 在 `IN_PROGRESS` 和这一刻之前都显示求助按钮」）。
+    /// 完成后、`sosWindowEndsAt` 之前：跑者的求助仍挂在这一单上走云端（契约：「iOS 在 `IN_PROGRESS` 和这一刻之前都显示求助按钮」）。
     func isWithinPostFinishSOSWindow(now: Date) -> Bool {
-        guard status == .completed, let until = postFinishSosUntil?.nilIfBlank?.backendTimestamp else { return false }
+        guard status == .completed, let until = sosWindowEndsAt?.nilIfBlank?.backendTimestamp else { return false }
         return now < until
     }
 

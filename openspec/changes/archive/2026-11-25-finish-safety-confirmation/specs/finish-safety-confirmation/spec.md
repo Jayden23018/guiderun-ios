@@ -39,12 +39,12 @@ While the order is `IN_PROGRESS` and `finishRequestedAt` is non-null, the runner
 - **THEN** both apps return to the normal running page without the button or the notice
 
 ### Requirement: Post-finish SOS stays on the order
-After `COMPLETED` and before the backend `postFinishSosUntil`, the runner SOS MUST go to the cloud with this order's ID. The volunteer SOS MUST stay `IN_PROGRESS`-only.
+After `COMPLETED` and before the backend `sosWindowEndsAt`, the runner SOS MUST go to the cloud with this order's ID. The volunteer SOS MUST stay `IN_PROGRESS`-only.
 
 #### Scenario: Runner presses help just after finishing
-- **WHEN** the order is `COMPLETED` and now is before `postFinishSosUntil`
+- **WHEN** the order is `COMPLETED` and now is before `sosWindowEndsAt`
 - **THEN** `BlindHomeSOSMode.resolve` returns cloud and `EmergencyCoordinator.trigger` sends with the order ID
 
 #### Scenario: Window has passed
-- **WHEN** now is at or after `postFinishSosUntil`, or the field is null
+- **WHEN** now is at or after `sosWindowEndsAt`, or the field is null
 - **THEN** the runner entry falls back to local dialing as before

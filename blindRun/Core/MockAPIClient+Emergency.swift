@@ -26,7 +26,7 @@ extension MockAPIClient {
         guard let order = orders.first(where: { $0.orderId == request.orderId }) else {
             throw APIError.serverError(ErrorResponse(code: "BAD_REQUEST", message: "订单不存在"))
         }
-        // 完成后的求助窗口（#902）：跑者在 `postFinishSosUntil` 之前发的求助后端照常受理、挂在这一单上。
+        // 完成后的求助窗口（#902）：跑者在 `sosWindowEndsAt` 之前发的求助后端照常受理、挂在这一单上。
         guard order.status == .inProgress || order.isWithinPostFinishSOSWindow(now: Date()) else {
             throw APIError.serverError(
                 ErrorResponse(code: "NOT_ORDER_PARTICIPANT", message: "您无权操作此订单")

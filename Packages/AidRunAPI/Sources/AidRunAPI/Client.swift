@@ -1988,7 +1988,7 @@ public struct Client: APIProtocol {
     ///    两侧各外扩 `app.order.booking-buffer-minutes`（默认 60）判区间相交。
     ///    🚩 **2026-09-05 起从「有任何未走完的单就拒绝」改成只拦时段冲突** —— 跨天预约上线后，
     ///    约了后天早上的单不该让人这两天里下不了任何单，而取消预约就抢不回那个志愿者了。
-    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 3）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
+    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 8）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
     ///    这是第 7 条放开之后唯一的刷单闸门。
     ///    **取消次数闸（#826 M9）**：滚动 `app.order.cancel-limit-window-hours`（默认 24）小时内，**已开始派单**就被盲人自己取消的单满
     ///    `app.order.cancel-limit-count`（默认 5）张时拒绝，409 `ORDER_CANCEL_LIMIT_REACHED`，`message` 里带最早恢复下单的时刻。
@@ -3170,6 +3170,121 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// 盲人确认已在安全地点，结束陪跑
+    ///
+    /// 角色：`BLIND`（本单下单人）。陪跑员调 `POST /api/orders/{id}/finish` 之后（订单详情 `finishRequestedAt` 非空），
+    /// 盲人收到 `FINISH_SAFETY_CONFIRM_REQUESTED`（HIGH），确认自己已在安全地点后调本端点，订单进入 `COMPLETED`。
+    /// 结束前确认跑者在安全地点是负责人 2026-11-22 定的规则（#902）。盲人还不安全时**不要**调用：订单保持 `IN_PROGRESS`，
+    /// 位置互推、走散检测和号码都照常；陪跑员要等 `unilateralFinishOpensAt` 之后才能单方面结束。
+    ///
+    /// 与陪跑员结束走同一条完成逻辑（完成次数、积分、服务时长照常）。这一单还有未结束的紧急求助时返回 409 `ORDER_HAS_ACTIVE_EMERGENCY`。
+    ///
+    /// 幂等：已由本人确认完成的单重复调用返回 200。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/confirm-safe`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)`.
+    public func confirmSafe(_ input: Operations.confirmSafe.Input) async throws -> Operations.confirmSafe.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.confirmSafe.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/orders/{}/confirm-safe",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.confirmSafe.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            OpenAPIRuntime.OpenAPIObjectContainer.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                case 403:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.confirmSafe.Output.Forbidden.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ApiErrorResponse.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .forbidden(.init(body: body))
+                case 409:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.confirmSafe.Output.Conflict.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ApiErrorResponse.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .conflict(.init(body: body))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// 陪跑员已动身（真的出门了，开始双向推位置）
     ///
     /// ⚠️ **与 `/confirm-departure` 不是一回事，别弄混**：那一步只回答「你还去吗」，人可能还在家里；
@@ -3389,6 +3504,19 @@ public struct Client: APIProtocol {
         )
     }
     /// 角色：`VOLUNTEER`（本单接单人）或 `BLIND`（本单下单人，#346）。仅接受 `IN_PROGRESS` （比状态迁移表更严：表里 `DRIVER_EN_ROUTE`/`DRIVER_ARRIVED` → `COMPLETED` 也是合法边， 但那条只给超时自动完成用）。
+    ///
+    /// 🆕 **陪跑员结束分两步（#902，负责人 2026-11-22 定「结束前确认跑者在安全地点」）**：
+    /// 确认闸由 `app.order.finish-blind-confirm-timeout-minutes` 控制（负责人定 10 分钟；默认 0 = 关闭，此时陪跑员调用即完成，`completed=true`，
+    /// 支持两步结束的 iOS 上架后生产才打开）。闸开着时：
+    /// 第一次调用**不完成订单**，只记下请求（订单详情 `finishRequestedAt`）并推盲人 `FINISH_SAFETY_CONFIRM_REQUESTED`，
+    /// 响应 `completed=false`、`unilateralFinishOpensAt` = 请求时刻 + 上面那个分钟数。
+    /// 盲人调 `POST /api/orders/{id}/confirm-safe` 后订单完成。盲人一直没确认时，陪跑员在 `unilateralFinishOpensAt` 之后再调一次本端点，
+    /// 订单单方面完成（`completed=true`）；早于这个时刻返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，message 可直接朗读，
+    /// 同时给盲人重推一次确认请求（距上次推送满 1 分钟才推）。
+    /// **结束请求自动失效**（负责人 2026-11-22 定）：请求只在「请求时刻 + 2 × 确认超时」（10 分钟时为 20 分钟）之前有效。
+    /// 过了这个时刻，陪跑员再调本端点等于重新请求：请求时刻换成现在、再推一次 `FINISH_SAFETY_CONFIRM_REQUESTED`、返回 `completed=false`，
+    /// 不会直接完成（盲人说过「还没到，继续陪」之后，隔很久再点仍要再问他一次）。
+    /// 不按位置判断。预定结束时间 + 60 分钟的自动完成不变。响应 `completed=true` 才表示订单已经结束。
     ///
     /// **盲人结束**只在陪跑员掉线时放行：陪跑员已超过 `app.order.blind-finish-volunteer-offline-minutes` （默认 5 分钟）没有上报位置。判据由后端算，客户端不用自己判，按下去看返回即可： 陪跑员还在线时返回 409 `VOLUNTEER_STILL_ONLINE`，message 里带最早可以结束的时刻（可直接朗读）。 盲人结束的单对陪跑员照常算完成、积分和服务时长，与陪跑员结束走同一条逻辑， 只在订单状态日志里记下是盲人结束的。
     ///
@@ -4742,15 +4870,15 @@ public struct Client: APIProtocol {
     ///   存量志愿者已由 `migrations/0007_backfill_volunteer_verified.sql` 一次性放行（无感知），
     ///   仅新注册志愿者需先走 `POST /api/volunteer/verification` 上传证书并等待管理员审核。
     /// - 403 `VOLUNTEER_NOT_AVAILABLE` — 志愿者关闭了接单开关（`wantsDispatch=false`）
-    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你
+    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你 / 邀请已失效。
+    ///   也包括「要先通话、距开跑已不够聊一轮」（#970）：`ACCEPT` 和 `INTERESTED` 都回这个，
+    ///   message 是「距开跑已不够先通一次电话，这一单不能再接了」，熟人也一样。
+    ///   例外：开跑之后才重新匹配的单不先通话，替补直接 `ACCEPT`（`requiresIntroCall=false`）
     /// - 409 `ORDER_ALREADY_ACCEPTED` — 已被他人接单 / 状态不允许接单
     /// - 409 `ORDER_CONCURRENT_CONFLICT` — 乐观锁并发冲突，可稍后重试
-    /// - 409 `INTRO_CALL_REQUIRED` — 没聊过的一对发了 `ACCEPT`，改发 `INTERESTED`
-    /// - 409 `INTRO_CALL_NOT_REQUIRED` — 已聊成过的一对发了 `INTERESTED`，改发 `ACCEPT`。
-    ///   正常流程走不到（`requiresIntroCall` 对熟人恒为 false），撞上通常是界面状态过期 /
-    ///   弱网重试 / 旧版客户端。⚠️ 后端**刻意不「顺手当 ACCEPT 处理」**：`INTERESTED` 不构成接单、
-    ///   聊崩了对志愿者没有统计损失，`ACCEPT` 当场把他绑在这一单上，静默转换等于替他做了承诺。
-    ///   客户端收到后按 `requiresIntroCall=false` 重发 `ACCEPT` 即可
+    /// - 409 `INTRO_CALL_REQUIRED` — 要求先通话的单发了 `ACCEPT`，改发 `INTERESTED`。
+    ///   #970 起磨合成功过的一对（含固定搭档）也会收到
+    /// - `INTRO_CALL_NOT_REQUIRED` — #970 起不再下发（熟人不再免通话）。旧版说明：已聊成过的一对发了 `INTERESTED`
     /// - 409 `INTRO_CALL_PAIR_BUSY` — 你和这位跑者正在为**另一张单**通话磨合，又对这一张发了 `INTERESTED`。
     ///   一对人同一时刻只能为一张单通话。提示先把那一单聊完：聊成了这一单直接 `ACCEPT`
     ///
@@ -5930,7 +6058,27 @@ public struct Client: APIProtocol {
                     }
                     return .ok(.init(body: body))
                 case 400:
-                    return .badRequest(.init())
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.updateRunnerMessage.Output.BadRequest.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ApiErrorResponse.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .badRequest(.init(body: body))
                 case 403:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
                     let body: Operations.updateRunnerMessage.Output.Forbidden.Body

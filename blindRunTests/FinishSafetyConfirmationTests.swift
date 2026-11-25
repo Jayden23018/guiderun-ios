@@ -149,7 +149,7 @@ final class FinishSafetyConfirmationTests: XCTestCase {
 
     func testRunnerHelpStaysOnTheCloudUntilThePostFinishWindowEnds() throws {
         let until = Date().addingTimeInterval(600)
-        let order = try Self.order(status: "COMPLETED", extra: #","postFinishSosUntil":"\#(Self.stamp(until))""#)
+        let order = try Self.order(status: "COMPLETED", extra: #","sosWindowEndsAt":"\#(Self.stamp(until))""#)
 
         XCTAssertEqual(BlindHomeSOSMode.resolve(order: order, role: .blind, now: until.addingTimeInterval(-1)), .cloudTrigger)
         XCTAssertEqual(BlindHomeSOSMode.resolve(order: order, role: .blind, now: until.addingTimeInterval(1)), .localCall)

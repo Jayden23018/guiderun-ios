@@ -1,6 +1,6 @@
 ## 1. 契约与模型
 
-- [x] 1.1 订单详情接 `finishRequestedAt`、`unilateralFinishOpensAt`、`postFinishSosUntil`（宽容解码，`replacingStatus` 带过去）
+- [x] 1.1 订单详情接 `finishRequestedAt`、`unilateralFinishOpensAt`、`sosWindowEndsAt`（宽容解码，`replacingStatus` 带过去）
 - [x] 1.2 `finish` 读 `FinishOrderResponse.completed`；新增 `confirmSafe` 端点与服务方法
 - [x] 1.3 错误码 `BLIND_SAFETY_CONFIRMATION_PENDING`，念后端 message
 

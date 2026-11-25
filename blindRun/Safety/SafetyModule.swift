@@ -885,7 +885,7 @@ enum BlindHomeSOSMode: Equatable {
     ///
     /// 独立成静态方法而不是写在 View 里，是为了能被单测直接钉住：真机 UI 测试通道
     /// 目前起不来（code 74），把这条安全判据只放在 UI 断言里等于没有覆盖。
-    /// 跑者完成后、`postFinishSosUntil` 之前也算云端（#902），见 `OrderDetailResponse.canTriggerEmergency(as:now:)`。
+    /// 跑者完成后、`sosWindowEndsAt` 之前也算云端（#902），见 `OrderDetailResponse.canTriggerEmergency(as:now:)`。
     static func resolve(
         order: OrderDetailResponse?, role: UserRole?, isSessionExpired: Bool = false, now: Date = Date()
     ) -> BlindHomeSOSMode {
