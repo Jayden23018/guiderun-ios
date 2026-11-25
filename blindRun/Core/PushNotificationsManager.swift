@@ -339,17 +339,19 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
         let content = notification.request.content
         let text = Self.speechText(userInfo: content.userInfo, fallbackBody: content.body)
         guard !text.isEmpty else { return }
-        Task { @MainActor in await self.announce(text) }
+        Task { @MainActor in await self.announce(text, userInfo: content.userInfo) }
     }
 
     /// 朗读推送，**只在有人登录时**（#459）：没人登录时收到或点开的只可能是上一个账号的。
     /// 冷启动点开通知时会话还在恢复，先等它恢复完再判，免得把本人的消息也吞掉（最多等 `restorationWait`）。
-    func announce(_ text: String, restorationWait: TimeInterval = 5) async {
+    func announce(_ text: String, userInfo: [AnyHashable: Any] = [:], restorationWait: TimeInterval = 5) async {
         let deadline = Date().addingTimeInterval(restorationWait)
         while appState?.sessionRestorationState == .restoring, Date() < deadline {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
         guard appState?.isLoggedIn == true else { return }
+        // 冷启动点开推送时会话恢复前没有 userId，入口那道比对放行了；恢复完再比一次（backend#1018）。
+        guard PushRecipientGate.isForCurrentUser(userInfo, currentUserId: appState?.userId) else { return }
         speechService?.speak(text)
     }
 
