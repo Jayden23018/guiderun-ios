@@ -77,12 +77,14 @@ extension AccessibilityAuditTests {
         let title = app.staticTexts["陪跑员已退出"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 30), "陪跑员出发后退出，重新匹配页没说「陪跑员已退出」")
         // 测试开关推的那条通知横幅盖在头卡上，审计会把横幅底下的字判成对比度不足：先关掉。
-        // 开关连推两条（通知 + 状态推送），关掉一条可能还有下一条，最多关三次。
-        let closeBanner = app.buttons["关闭"].firstMatch
-        for _ in 0..<3 where closeBanner.waitForExistence(timeout: 3) {
-            closeBanner.tap()
+        // 横幅是一个合并的读屏元素，「关闭」不在树里，按坐标点（写法同 `testForegroundBannerDismissReachesWellBelowItsTextLine`：
+        // 按钮靠右、顶部对齐、64pt 高）。关掉一条可能还有下一条，最多关三次。
+        let banner = walkthroughElement(app, "realtimeForegroundNotification")
+        for _ in 0..<3 where banner.waitForExistence(timeout: 3) {
+            banner.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: banner.frame.width - 46, dy: 48)).tap()
             sleep(1)
         }
+        XCTAssertFalse(banner.exists, "通知横幅关不掉")
         sleep(1)
         walkthroughAttach(app, "W4-rematch-mid-run")
         walkthroughRecordA11yOrder(app, "W4-rematch-mid-run")
