@@ -1,6 +1,8 @@
 import Foundation
 
 // UI 用例演实时事件的开关。单独成文件：`blindRunApp.swift` 已超 SwiftLint 长度上限，棘轮不许它再变长。
+// 编译条件与 `blindRunApp.swift` 里被调用的 `injectUITestVolunteerLostIfNeeded`、调用处一致：Release 里两者都不存在（#1029 漏了这层，Release 编不过）。
+#if DEBUG || DEMO
 extension blindRunApp {
     /// 测试开关推的那条求助的事件号。随便取的，只要和 Mock 里别的事件号不撞。
     private static let uiTestVolunteerEmergencyEventID: Int64 = 9001
@@ -49,3 +51,4 @@ extension blindRunApp {
         #endif
     }
 }
+#endif
