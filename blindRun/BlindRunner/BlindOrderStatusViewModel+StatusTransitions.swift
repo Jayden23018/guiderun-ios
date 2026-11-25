@@ -145,8 +145,6 @@ extension BlindOrderStatusViewModel {
            updated.status == .pendingAccept || updated.status == .scheduledConfirmed {
             return BlindIntroCallOutcomeCopy.agreed(order: updated)
         }
-        let announcement = updated.blindRunnerAnnouncement(distanceText: volunteerDistanceToStartText)
-        // 冷启动进来时陪跑员已请求结束（#902）：横幅那一句已经错过了，在这里补上，不然他不知道页面上多了确认按钮。
-        return updated.isAwaitingBlindSafetyConfirmation ? "\(announcement) \(FinishSafetyCopy.blindStatusSuffix)" : announcement
+        return updated.blindRunnerAnnouncement(distanceText: volunteerDistanceToStartText)
     }
 }

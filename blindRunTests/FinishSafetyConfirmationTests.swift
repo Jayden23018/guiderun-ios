@@ -95,15 +95,17 @@ final class FinishSafetyConfirmationTests: XCTestCase {
         XCTAssertEqual(replaced.unilateralFinishOpensAt, "2026-11-25T10:10:00")
     }
 
-    func testColdStartAnnouncementMentionsThePendingRequest() throws {
-        let viewModel = BlindOrderStatusViewModel()
-        let order = try Self.order(status: "IN_PROGRESS", extra: #","finishRequestedAt":"2026-11-25T10:00:00""#)
+    func testColdStartSpeaksThePendingRequestOnceButNotOnLaterPolls() throws {
+        let pending = try Self.order(status: "IN_PROGRESS", extra: #","finishRequestedAt":"2026-11-25T10:00:00""#)
+        typealias VM = BlindOrderStatusViewModel
 
-        let sentence = viewModel.statusChangeAnnouncement(from: nil, to: order)
-
-        XCTAssertTrue(sentence.contains(FinishSafetyCopy.blindConfirmButton), "杀掉重开的跑者要听得到确认按钮")
-        XCTAssertFalse(viewModel.statusChangeAnnouncement(from: nil, to: try Self.order(status: "IN_PROGRESS"))
-            .contains(FinishSafetyCopy.blindConfirmButton))
+        XCTAssertTrue(VM.announcesFinishRequestOnLoad(previousStatus: nil, updated: pending, speakChanges: true),
+                      "杀掉重开的跑者要听得到确认按钮")
+        XCTAssertFalse(VM.announcesFinishRequestOnLoad(previousStatus: .inProgress, updated: pending, speakChanges: true),
+                       "页面开着时由全局横幅念，轮询不再念第二遍")
+        XCTAssertFalse(VM.announcesFinishRequestOnLoad(previousStatus: nil, updated: try Self.order(status: "IN_PROGRESS"),
+                                                       speakChanges: true))
+        XCTAssertTrue(FinishSafetyCopy.blindStatusSuffix.contains(FinishSafetyCopy.blindConfirmButton))
     }
 
     func testRunnerConfirmCallsConfirmSafeOnce() async throws {
@@ -175,7 +177,7 @@ final class FinishSafetyConfirmationTests: XCTestCase {
     }
 
     func testMockOpenGateRequestsThenRejectsThenFinishesUnilaterally() async throws {
-        let (mock, orders) = makeMock(timeout: 1.0, role: .volunteer)
+        let (mock, orders) = makeMock(timeout: 10, role: .volunteer)
 
         let first = try await orders.finish(orderId: Self.mockOrderId)
         XCTAssertFalse(first.completed)
@@ -190,7 +192,8 @@ final class FinishSafetyConfirmationTests: XCTestCase {
             XCTAssertEqual(error.errorCode, .blindSafetyConfirmationPending)
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        // 不靠睡眠：把请求时刻拨到超时之前、作废之前（计时测试在慢设备上会越过作废点）。
+        mock.finishRequestTimes[Self.mockOrderId] = Date().addingTimeInterval(-11)
         let last = try await orders.finish(orderId: Self.mockOrderId)
         XCTAssertTrue(last.completed)
         XCTAssertEqual(mock.orders.first?.status, .completed)
@@ -209,10 +212,10 @@ final class FinishSafetyConfirmationTests: XCTestCase {
     }
 
     func testMockRequestExpiresAndTheButtonGoesAway() async throws {
-        let (mock, orders) = makeMock(timeout: 0.3, role: .blind)
+        let (mock, orders) = makeMock(timeout: 10, role: .blind)
         _ = try mock.simulateVolunteerFinishForTesting(orderId: Self.mockOrderId)
 
-        try await Task.sleep(nanoseconds: 700_000_000)
+        mock.finishRequestTimes[Self.mockOrderId] = Date().addingTimeInterval(-21) // 过了 2 × 超时
         let detail = try await orders.orderDetail(orderId: Self.mockOrderId)
 
         XCTAssertNil(detail.finishRequestedAt, "请求在 2 × 超时后作废")
