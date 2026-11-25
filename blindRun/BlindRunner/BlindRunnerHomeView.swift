@@ -28,6 +28,8 @@ final class BlindRunnerHomeViewModel: ObservableObject {
     @Published var otherOrders: [OrderDetailResponse] = []
     /// 第 2、3 张没加载出来。首页显示并念一句，「重试加载」重来一遍。
     @Published var otherOrdersFailed = false
+    /// 首页替「其余几张」登记进实时协调器的单号（#1011）。只由 `+OtherOrders` 写。
+    var registeredOtherOrderIDs: Set<Int64> = []
     /// 陪跑中按了紧急入口，等订单页接走（#605）。由 `BlindRunnerTabView` 写，订单页读完清空。
     @Published var orderSafetyRequest: BlindOrderSafetyRequest?
     @Published private(set) var orderLoadState: AsyncLoadState<OrderDetailResponse?> = .idle
@@ -161,7 +163,10 @@ final class BlindRunnerHomeViewModel: ObservableObject {
     }
 
     private func applyRealtimeStatus(_ update: RealtimeOrderStatusUpdate) {
-        guard let current = activeOrder, current.orderId == update.orderId else { return }
+        guard let current = activeOrder, current.orderId == update.orderId else {
+            applyRealtimeStatusToOtherOrder(update)
+            return
+        }
         let updated = current.replacingStatus(with: update.toStatus)
         announceRealtimeStatusUnlessOrderPageSpoke(updated, update: update)
         if updated.status.isActiveForBlindRunner {
@@ -187,23 +192,6 @@ final class BlindRunnerHomeViewModel: ObservableObject {
         }
         orderLoadState = .loaded(activeOrder)
         errorMessage = nil
-    }
-
-    /// 跑者订单页开着、跟着这一单时，状态句以订单页为准（负责人 2026-11-08 定，`unify-order-live-tracking` design §6）：
-    /// 通话磨合没成、成单时只有订单页那句带具体内容。订单页这一次没念（`order` 还没拉回来、完成态）
-    /// 或等回话超时，首页照念。只有念不念等这个结果，`activeOrder` 在上面照常同步更新。
-    private func announceRealtimeStatusUnlessOrderPageSpoke(
-        _ updated: OrderDetailResponse,
-        update: RealtimeOrderStatusUpdate
-    ) {
-        guard let tracker = appState?.realtimeCoordinator.orderLiveTracker else {
-            speechService?.speakBlindRunnerStatusChange(updated, text: updated.blindRunnerAnnouncement())
-            return
-        }
-        Task { @MainActor [weak self] in
-            guard await tracker.pageAnnouncement(for: update, role: .blind) == .homeShouldSpeak else { return }
-            self?.speechService?.speakBlindRunnerStatusChange(updated, text: updated.blindRunnerAnnouncement())
-        }
     }
 
     /// - Parameter announcesStatus: 首启引导页正压在首页上时传 `false`。
@@ -361,7 +349,7 @@ final class BlindRunnerHomeViewModel: ObservableObject {
     /// `activeOrder` 还是 nil，照播就是对着一个有活跃订单的盲人念「可以点击开始约跑」。
     /// 只在**加载成功**时才置位，所以失败/超时那条路不会欠 —— 那边由没有加闸的
     /// `speakError` 负责，两条不会互相盖。
-    @Published private(set) var owesStatusAnnouncement = false
+    @Published var owesStatusAnnouncement = false
 
     private func settleStatusAnnouncement(announcesStatus: Bool) {
         owesStatusAnnouncement = !announcesStatus
@@ -428,7 +416,7 @@ final class BlindRunnerHomeViewModel: ObservableObject {
                 appState.realtimeCoordinator.unregisterActiveOrder(updated.orderId)
                 appState.liveEscortCoordinator.clearOwnedOrder()
             }
-            self.speechService?.speakStatusChange(updated.status, text: updated.blindRunnerAnnouncement())
+            self.speechService?.speakStatusChange(updated.status, text: updated.blindRunnerAnnouncement(), orderID: updated.orderId)
             isPerformingAction = false
         } catch let error as APIError {
             isPerformingAction = false
@@ -494,6 +482,7 @@ struct BlindRunnerHomeView: View {
     @EnvironmentObject private var speechService: SpeechService
     @EnvironmentObject private var locationService: LocationService
     @EnvironmentObject private var speechInputService: SpeechInputService
+    @Environment(\.scenePhase) private var scenePhase
 
     /// **由 `BlindRunnerTabView` 注入，不再自己 `@StateObject` 持有。**
     ///
@@ -647,6 +636,11 @@ struct BlindRunnerHomeView: View {
             }
             // 订单走完回到首页时要刷新本月次数，所以跟着订单号走。`.task` 切回本 tab 也会重跑，
             // 这里没有播报，重跑只是多拿一次最新数据。有订单时这些数据不显示，不用请求。
+            // 回前台重拉（#1011）：后台时错过的状态变化要补上，有变化才念。
+            .onChange(of: scenePhase) { phase in
+                guard phase == .active else { return }
+                Task { await viewModel.refreshOnForeground() }
+            }
             .task(id: viewModel.activeOrder?.orderId) {
                 guard viewModel.activeOrder == nil else { return }
                 await idleModel.refresh(appState: appState)

@@ -36,6 +36,7 @@ extension BlindRunnerHomeViewModel {
         guard order.status.isActiveForBlindRunner else { return }
         guard activeOrder == nil else {
             otherOrders.append(order)
+            if let appState { syncOtherOrderRegistration(appState: appState) }
             return
         }
         activeOrder = order
@@ -72,6 +73,7 @@ extension BlindRunnerHomeViewModel {
         guard let activeOrder else {
             otherOrders = []
             otherOrdersFailed = false
+            syncOtherOrderRegistration(appState: appState)
             return
         }
         let orders = appState.orders
@@ -84,6 +86,7 @@ extension BlindRunnerHomeViewModel {
             }
             otherOrders = page.content.filter { $0.orderId != activeOrder.orderId && $0.status.isActiveForBlindRunner }
             otherOrdersFailed = false
+            syncOtherOrderRegistration(appState: appState)
         } catch let error as APIError where error.endsSession {
             return
         } catch {

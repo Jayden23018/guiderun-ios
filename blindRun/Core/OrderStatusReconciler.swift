@@ -156,7 +156,7 @@ struct OrderStatusReconciler {
     }
 }
 
-private extension RunOrderStatus {
+extension RunOrderStatus {
     var lifecycleRank: Int {
         switch self {
         // `.pendingIntroCall` 与 `.pendingMatch` **同档**，这不是偷懒。

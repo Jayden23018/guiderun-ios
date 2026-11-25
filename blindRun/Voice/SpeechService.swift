@@ -15,7 +15,10 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     @Published private(set) var lastSpokenText: String?
     @Published private(set) var latestRepeatableText: String?
     @Published private(set) var lastVoiceOverAnnouncement: String?
-    private(set) var lastSpokenStatus: RunOrderStatus?
+    var lastSpokenStatus: RunOrderStatus?
+    /// 与 `lastSpokenStatus` 成对：去重键是「订单 + 状态」，不是全 App 一个状态（#1011）。
+    /// 先取消 A 再取消 B，两张单的状态都是 `CANCELLED`，只比状态会把 B 那句吞掉。
+    var lastSpokenOrderID: Int64?
     /// 当前正在播的那一条。**代理回调必须拿它对一次身份才能清 `isSpeaking`。**
     ///
     /// `speak(text:)` 是「先 `stopSpeaking(.immediate)` 再播新的」。旧的那条随后会回一次
@@ -200,38 +203,6 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
         postVoiceOverAnnouncement(text)
     }
 
-    /// 播报订单状态变化（防重复）
-    /// 只在状态真正变化时播报，避免轮询时反复播报同一状态。
-    ///
-    /// 触觉挂在这里而不是各个业务分支上：这两个重载是**状态变化播报的唯一 funnel**
-    /// （`BlindOrderStatusView.apply` 与首页都从这儿过），且防重复的 guard 已经在这一层，
-    /// 挂在下游会跟着轮询反复震。触觉是语音的冗余通道，两者必须同生同灭 ——
-    /// 单独一下震动没有语义，用户分不出是接单还是取消。见 `HapticFeedback`。
-    @discardableResult
-    func speakStatusChange(_ status: RunOrderStatus) -> Bool {
-        guard status != lastSpokenStatus else { return false }
-        lastSpokenStatus = status
-        speak(text: Self.statusAnnouncement(for: status))
-        status.haptic.map(HapticFeedback.play)
-        return true
-    }
-
-    @discardableResult
-    func speakStatusChange(_ status: RunOrderStatus, text: String, priority: AnnouncementPriority = .counterpartAction) -> Bool {
-        guard status != lastSpokenStatus else { return false }
-        lastSpokenStatus = status
-        speak(text: text, priority: priority)
-        status.haptic.map(HapticFeedback.play)
-        return true
-    }
-
-    /// 这一态已经由别处用自己的整句念过了（陪跑员订单页的跑者取消那句，#462）：只记下去重键、不念，
-    /// 让随后到的通用状态句被 `speakStatusChange` 挡掉。整句本身照常走 `speak` ——
-    /// 不让它也过去重，免得上一单留下的同一个键把这一单「不算你的取消」吞掉。
-    func markStatusAnnounced(_ status: RunOrderStatus) {
-        lastSpokenStatus = status
-    }
-
     /// 重复播报当前状态（"重复当前状态"按钮调用）
     func repeatCurrentStatus() {
         speak(text: latestRepeatableText ?? "当前没有进行中的订单。")
@@ -299,6 +270,7 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     /// 重置最后播报状态（切换订单时调用）
     func resetLastStatus() {
         lastSpokenStatus = nil
+        lastSpokenOrderID = nil
         latestRepeatableText = nil
     }
 

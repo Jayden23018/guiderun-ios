@@ -44,7 +44,9 @@ extension AppRealtimeCoordinator {
         orderStatusReconciler.removeAll()
         retainedOrderStatusIdentities = [:]
         retainedOrderStatusIdentityOrder = []
-        recentLifecycleStatusDates = [:]
+        recentLifecycleUpdates = []
+        heldLifecycleNotifications.forEach { $0.task.cancel() }
+        heldLifecycleNotifications = []
         latestPeerSamples = [:]
         peerPublishTasks = [:]
     }

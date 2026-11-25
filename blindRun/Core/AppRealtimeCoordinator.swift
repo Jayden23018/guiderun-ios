@@ -168,7 +168,12 @@ final class AppRealtimeCoordinator: ObservableObject {
     var orderStatusReconciler = OrderStatusReconciler()
     var retainedOrderStatusIdentities: [String: RetainedOrderStatusIdentity] = [:]
     var retainedOrderStatusIdentityOrder: [String] = []
-    var recentLifecycleStatusDates: [RunOrderStatus: Date] = [:]
+    /// 刚到的订单状态推送（只记登记过的单）。生命周期横幅靠它认出「订单页已经在跟这一次变化」，
+    /// 配对一次就消耗掉，所以一次推送最多压掉一条横幅。
+    var recentLifecycleUpdates: [RecentLifecycleUpdate] = []
+    /// 先于状态推送到的生命周期通知，等配对。到点没配上就照常弹。
+    var heldLifecycleNotifications: [HeldLifecycleNotification] = []
+    let lifecycleHoldDelay: TimeInterval
     var latestPeerSamples: [String: RealtimePeerLocationSample] = [:]
     var peerPublishTasks: [String: Task<Void, Never>] = [:]
     var hasConnectedOnce = false
@@ -203,10 +208,12 @@ final class AppRealtimeCoordinator: ObservableObject {
         deduplicationWindow: TimeInterval = 120,
         orderRefreshRetryDelays: [TimeInterval] = [1, 2, 4],
         maximumQueuedNotifications: Int = 24,
-        dispatchProgressSettleDelay: TimeInterval = 1
+        dispatchProgressSettleDelay: TimeInterval = 1,
+        lifecycleHoldDelay: TimeInterval = 2
     ) {
         self.now = now
         self.dispatchProgressSettleDelay = dispatchProgressSettleDelay
+        self.lifecycleHoldDelay = lifecycleHoldDelay
         self.notificationDuration = notificationDuration
         self.deduplicationWindow = deduplicationWindow
         self.orderRefreshRetryDelays = orderRefreshRetryDelays
