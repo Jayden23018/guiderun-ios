@@ -57,13 +57,16 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
             .task(id: coordinator.volunteerAlert?.eventID) {
                 await coordinator.keepVolunteerAlertFresh(safety: appState.safety)
             }
-            .onReceive(appState.realtimeCoordinator.statusUpdatePublisher.receive(on: DispatchQueue.main)) { update in
-                Task { await coordinator.handleVolunteerAlertOrderStatus(orderID: update.orderId, status: update.toStatus, safety: appState.safety) }
+            // 整条流用 async（仓库约定不在同一条数据流里混 Combine 订阅和 await）。
+            .task {
+                for await update in appState.realtimeCoordinator.statusUpdatePublisher.values {
+                    await coordinator.handleVolunteerAlertOrderStatus(orderID: update.orderId, status: update.toStatus, safety: appState.safety)
+                }
             }
             .onAppear { shownAlertEventID = coordinator.volunteerAlert?.eventID }
             .onChange(of: coordinator.volunteerAlert?.eventID) { eventID in
-                // 收起时念一句，不悄悄消失；退出登录时（`reset()`）不念。
-                if eventID == nil, shownAlertEventID != nil, appState.isLoggedIn {
+                // 收起时念一句，不悄悄消失；退出登录、切换角色时（`reset()`）不念。
+                if eventID == nil, shownAlertEventID != nil, appState.isLoggedIn, appState.activeRole == .volunteer {
                     speechService.speak(EmergencySafetyCopy.volunteerAlertCleared)
                 }
                 shownAlertEventID = eventID
