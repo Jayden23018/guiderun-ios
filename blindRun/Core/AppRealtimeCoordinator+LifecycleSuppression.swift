@@ -74,8 +74,15 @@ extension AppRealtimeCoordinator {
             heldLifecycleNotifications.remove(at: index)
             return
         }
+        // 只记 8 种生命周期通知会宣布的状态，且顺手清过期的：别的状态推送没有横幅可配，留着只会误压后来的。
+        guard Self.lifecycleNotificationStatuses.contains(status) else { return }
+        pruneRecentLifecycleUpdates()
         recentLifecycleUpdates.append(RecentLifecycleUpdate(orderID: orderID, status: status, date: date))
     }
+
+    private static let lifecycleNotificationStatuses: Set<RunOrderStatus> = [
+        .pendingAccept, .driverEnRoute, .driverArrived, .completed, .cancelled, .rematching, .noVolunteer
+    ]
 
     private func hasTrackedOrderThatMayBecome(_ status: RunOrderStatus, orderID: Int64?) -> Bool {
         if let orderID { return activeOrderIDs.contains(orderID) }

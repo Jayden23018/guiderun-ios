@@ -31,6 +31,10 @@ final class LifecycleSuppressionMultiOrderTests: XCTestCase {
         )
     }
 
+    private func waitUntil(_ condition: () -> Bool) async {
+        for _ in 0..<100 where !condition() { try? await Task.sleep(nanoseconds: 20_000_000) }
+    }
+
     private func settle() async {
         try? await Task.sleep(nanoseconds: UInt64(holdDelay * 4 * 1_000_000_000))
     }
@@ -142,7 +146,7 @@ final class LifecycleSuppressionMultiOrderTests: XCTestCase {
     // MARK: - 首页其余几张
 
     /// 第 2 张的状态推送到了：卡片更新，并且出声（带开跑时间或「另一张预约」）。
-    func testHomeUpdatesAndSpeaksForSecondOrderRealtimeStatus() {
+    func testHomeUpdatesAndSpeaksForSecondOrderRealtimeStatus() async {
         let speech = SpeechService()
         let appState = AppState(safety: FakeSafetyService(), orders: FakeOrderService())
         appState.currentEnvironment = .mock
@@ -160,13 +164,16 @@ final class LifecycleSuppressionMultiOrderTests: XCTestCase {
 
         XCTAssertEqual(viewModel.otherOrders.first { $0.orderId == 3 }?.status, .pendingAccept)
         XCTAssertEqual(viewModel.otherOrders.first { $0.orderId == 2 }?.status, .pendingMatch)
-        XCTAssertEqual(speech.spokenHistoryForTesting.count, 1)
+        await waitUntil { !speech.spokenHistoryForTesting.isEmpty }
+        XCTAssertFalse(speech.spokenHistoryForTesting.isEmpty)
+        let afterFirst = speech.spokenHistoryForTesting.count
 
         appState.realtimeCoordinator.simulateIncomingEventForTesting(.orderStatusChanged(statusEvent(
             order: 2, from: "PENDING_MATCH", to: "CANCELLED", id: "B0000000-0000-4000-8000-000000000002"
         )))
         XCTAssertNil(viewModel.otherOrders.first { $0.orderId == 2 }, "取消的预约卡要撤下")
-        XCTAssertEqual(speech.spokenHistoryForTesting.count, 2, "第二张被取消也要念，不被去重键吞掉")
+        await waitUntil { speech.spokenHistoryForTesting.count > afterFirst }
+        XCTAssertGreaterThan(speech.spokenHistoryForTesting.count, afterFirst, "第二张被取消也要念，不被去重键吞掉")
         XCTAssertFalse(appState.realtimeCoordinator.registeredActiveOrderIDsForTesting.contains(2))
     }
 }

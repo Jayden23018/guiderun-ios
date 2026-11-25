@@ -34,7 +34,16 @@ extension BlindRunnerHomeViewModel {
             appState?.realtimeCoordinator.unregisterActiveOrder(updated.orderId)
         }
         let which = updated.plannedStartForAnnouncement.map { "\($0)的预约：" } ?? "另一张预约："
-        speechService?.speak(which + updated.blindRunnerAnnouncement(), priority: .counterpartAction)
+        let text = which + updated.blindRunnerAnnouncement()
+        // 与最早那张同一道闸：这一单的订单页正开着、自己会念时，首页不再念第二遍。
+        guard let tracker = appState?.realtimeCoordinator.orderLiveTracker else {
+            speechService?.speak(text, priority: .counterpartAction)
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard await tracker.pageAnnouncement(for: update, role: .blind) == .homeShouldSpeak else { return }
+            self?.speechService?.speak(text, priority: .counterpartAction)
+        }
     }
 
     /// App 回前台：重拉全部预约，补上后台时漏掉的变化。状态没变就不出声（切回来不该每次被念一遍）。
