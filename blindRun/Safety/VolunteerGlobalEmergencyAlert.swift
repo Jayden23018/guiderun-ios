@@ -107,6 +107,8 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
     /// 订单页自定义顶栏那一行的高度（返回 / 更多操作 / 求助都是 64pt 的按钮，`FlowOrderNavBar`）。
     /// 红条放在这一行下面：放进这一行会盖住「更多操作」（#1024 真机走查）。
     private static let topBarRowHeight: CGFloat = 64
+    /// 顶栏按钮随字号变高，但有上限：AX-XXXL 真机实测最高的是陪跑员首页「设置」88pt（#1024）。取 96 留余量。
+    private static let topBarRowMaxHeight: CGFloat = 96
     private static let barGapBelowTopBar: CGFloat = 4
     /// 左右各留的边距：最大字号时红条按字号放宽，但不贴屏幕边。
     private static let barSideMargin: CGFloat = 16
@@ -145,8 +147,9 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
             let screenWidth = scene.coordinateSpace.bounds.width
             let metrics = UIFontMetrics(forTextStyle: .caption1)
             let width = min(metrics.scaledValue(for: Self.barWidth), screenWidth - 2 * Self.barSideMargin)
+            let topBarRow = min(UIFontMetrics(forTextStyle: .body).scaledValue(for: Self.topBarRowHeight), Self.topBarRowMaxHeight)
             window.frame = CGRect(
-                x: (screenWidth - width) / 2, y: top + Self.topBarRowHeight + Self.barGapBelowTopBar,
+                x: (screenWidth - width) / 2, y: top + topBarRow + Self.barGapBelowTopBar,
                 width: width, height: metrics.scaledValue(for: Self.barHeight)
             )
             window.isHidden = false

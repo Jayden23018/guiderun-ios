@@ -77,8 +77,12 @@ extension AccessibilityAuditTests {
         let title = app.staticTexts["陪跑员已退出"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 30), "陪跑员出发后退出，重新匹配页没说「陪跑员已退出」")
         // 测试开关推的那条通知横幅盖在头卡上，审计会把横幅底下的字判成对比度不足：先关掉。
+        // 开关连推两条（通知 + 状态推送），关掉一条可能还有下一条，最多关三次。
         let closeBanner = app.buttons["关闭"].firstMatch
-        if closeBanner.waitForExistence(timeout: 3) { closeBanner.tap() }
+        for _ in 0..<3 where closeBanner.waitForExistence(timeout: 3) {
+            closeBanner.tap()
+            sleep(1)
+        }
         sleep(1)
         walkthroughAttach(app, "W4-rematch-mid-run")
         walkthroughRecordA11yOrder(app, "W4-rematch-mid-run")
@@ -174,7 +178,7 @@ extension AccessibilityAuditTests {
         let bar = walkthroughElement(app, "volunteerEmergencyBar")
         XCTAssertTrue(bar.waitForExistence(timeout: 10), "确认后顶部常驻入口没出现")
         XCTAssertEqual(bar.label, "跑者的求助还没结束", "红条的读屏文字不对")
-        XCTAssertTrue(bar.isHittable, "红条点不到，读屏也聚焦不到")
+        // 不断言 isHittable：红条在另一个 window 里，XCUITest 按主窗口判可点会报假的 false。能不能点由最后一步「点红条回到警报」验。
         sleep(1)
         walkthroughAttach(app, "W7-\(sizeName)-bar-home")
         walkthroughAssertBarClearsTopButtons(app, bar, page: "首页")
