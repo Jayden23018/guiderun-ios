@@ -177,6 +177,13 @@ extension MockAPIClient {
         return OrderNudgeResponse(success: true, orderId: orderId, ringingUntil: nil, delivered: true)
     }
 
+    /// 两个方向的响铃：`ring-runner`（陪跑员让跑者响）与 `ring-volunteer`（跑者让陪跑员响，#1023）。不是响铃路径返回 `nil`。
+    func handleRing(path: String, orderId: Int64) throws -> OrderNudgeResponse? {
+        if path.hasSuffix("/ring-runner") { return try handleRingRunner(orderId: orderId) }
+        if path.hasSuffix("/ring-volunteer") { return try handleRingVolunteer(orderId: orderId) }
+        return nil
+    }
+
     func handleRingRunner(orderId: Int64) throws -> OrderNudgeResponse {
         guard let order = orders.first(where: { $0.orderId == orderId }) else {
             throw APIError.serverError(ErrorResponse(code: "ORDER_NOT_FOUND", message: "订单不存在"))
@@ -189,6 +196,27 @@ extension MockAPIClient {
         let until = DateFormatter.aidRunBackendLocalDateTime.string(from: Date().addingTimeInterval(10))
         return OrderNudgeResponse(success: true, orderId: orderId, ringingUntil: until, delivered: true)
     }
+
+    /// 跑者让陪跑员的手机响。后端：`DRIVER_ARRIVED` / `IN_PROGRESS` 可按，其余 409；两次之间至少 10 秒，否则 429。
+    func handleRingVolunteer(orderId: Int64) throws -> OrderNudgeResponse {
+        guard let order = orders.first(where: { $0.orderId == orderId }) else {
+            throw APIError.serverError(ErrorResponse(code: "ORDER_NOT_FOUND", message: "订单不存在"))
+        }
+        guard order.status == .driverArrived || order.status == .inProgress else {
+            throw APIError.serverError(ErrorResponse(
+                code: "ORDER_STATUS_NOT_ALLOWED", message: "当前订单状态不允许该操作"))
+        }
+        let now = Date()
+        if let last = lastRingVolunteerAt[orderId], now.timeIntervalSince(last) < Self.ringVolunteerInterval {
+            throw APIError.rateLimited(RateLimitInfo(message: "刚刚已经响过了，请稍等几秒再按", retryAfterSeconds: 10))
+        }
+        lastRingVolunteerAt[orderId] = now
+        // 后端：受理时刻 + 10 秒，无时区本地时间串。
+        let until = DateFormatter.aidRunBackendLocalDateTime.string(from: now.addingTimeInterval(10))
+        return OrderNudgeResponse(success: true, orderId: orderId, ringingUntil: until, delivered: true)
+    }
+
+    static let ringVolunteerInterval: TimeInterval = 10
 
     func handleEndWaiting(orderId: Int64) throws -> EmptyResponse {
         guard let index = orders.firstIndex(where: { $0.orderId == orderId }) else {

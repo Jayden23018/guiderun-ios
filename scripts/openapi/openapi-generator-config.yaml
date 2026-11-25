@@ -83,6 +83,7 @@ filter:
     - /api/orders/{id}/reviews
     - /api/orders/{id}/rhythm
     - /api/orders/{id}/ring-runner
+    - /api/orders/{id}/ring-volunteer
     - /api/orders/{id}/run-record
     - /api/orders/{id}/run-record/messages
     - /api/orders/{id}/runner-message

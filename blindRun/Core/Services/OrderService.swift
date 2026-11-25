@@ -77,6 +77,8 @@ protocol OrderServing: Sendable {
     // 陪跑员订单页 v2。两个催促动作返回 `delivered` —— `false` 要提示「对方可能没收到」。
     func sendQuickMessage(_ code: QuickMessageCode, orderId: Int64) async throws -> OrderNudgeResponse
     func ringRunner(orderId: Int64) async throws -> OrderNudgeResponse
+    /// 跑者让陪跑员的手机响（后端 #1046）。响应与 `ringRunner` 同形，`ringingUntil` 之前按钮不可点。
+    func ringVolunteer(orderId: Int64) async throws -> OrderNudgeResponse
     /// 等满时限后结束等待。订单转 `CANCELLED`，不算陪跑员取消。
     func endWaiting(orderId: Int64) async throws
     /// 上传出发 / 汇合锁屏卡的推送 token（十六进制）。同一单再传一次即覆盖。
@@ -223,6 +225,10 @@ struct OrderService: OrderServing {
 
     func ringRunner(orderId: Int64) async throws -> OrderNudgeResponse {
         try await transport.send(OrderEndpoint.ringRunner(orderId: orderId).request)
+    }
+
+    func ringVolunteer(orderId: Int64) async throws -> OrderNudgeResponse {
+        try await transport.send(OrderEndpoint.ringVolunteer(orderId: orderId).request)
     }
 
     func registerLiveActivityToken(_ hexToken: String, orderId: Int64) async throws {

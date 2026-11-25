@@ -53,6 +53,8 @@ enum OrderEndpoint {
     // 陪跑员订单页 v2（后端 2026-09-26）：出发中 / 已到达的两个催促动作，与等满时限后结束等待
     case quickMessage(orderId: Int64)
     case ringRunner(orderId: Int64)
+    /// 反方向：跑者让陪跑员的手机响（后端 #1046）。`DRIVER_ARRIVED` / `IN_PROGRESS` 可按，`DRIVER_EN_ROUTE` 409。
+    case ringVolunteer(orderId: Int64)
     case endWaiting(orderId: Int64)
     /// 陪跑员出发 / 汇合锁屏卡的推送 token（只在 `DRIVER_EN_ROUTE` / `DRIVER_ARRIVED` 收，其余 409）。
     case liveActivityToken
@@ -119,6 +121,8 @@ enum OrderEndpoint {
             return EndpointRequest(.post, "/api/orders/\(orderId)/quick-message")
         case .ringRunner(let orderId):
             return EndpointRequest(.post, "/api/orders/\(orderId)/ring-runner")
+        case .ringVolunteer(let orderId):
+            return EndpointRequest(.post, "/api/orders/\(orderId)/ring-volunteer")
         case .endWaiting(let orderId):
             return EndpointRequest(.post, "/api/orders/\(orderId)/end-waiting")
         case .liveActivityToken:

@@ -147,6 +147,8 @@ extension BlindOrderStatusView {
             cards: {
                 if isFinished {
                     BlindRunFinishedCards(order: order, track: trackViewModel.track)
+                } else if BlindRingVolunteerCopy.isAvailable(in: order.status) {
+                    BlindRingVolunteerRow(orderId: order.orderId, status: order.status)
                 }
             },
             footer: { flowSkeletonFooter(order) }

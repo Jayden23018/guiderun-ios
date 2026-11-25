@@ -948,6 +948,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/orders/{id}/ring-runner`.
     /// - Remark: Generated from `#/paths//api/orders/{id}/ring-runner/post(ringRunner)`.
     func ringRunner(_ input: Operations.ringRunner.Input) async throws -> Operations.ringRunner.Output
+    /// 跑者让陪跑员的手机响铃（汇合期找人 / 陪跑中走散找人）
+    ///
+    /// （2026-11-25 新增，#1046；{@code ring-runner} 的反方向）角色 `BLIND`，且必须是**这一单的跑者**；
+    /// 在 `DRIVER_ARRIVED`（汇合期）与 `IN_PROGRESS`（陪跑中走散）可按，`DRIVER_EN_ROUTE`（陪跑员还在路上）不可。
+    /// 陪跑员收到 WS `APP_NOTIFICATION`：汇合期 `eventType=VOLUNTEER_RING`，陪跑中 `eventType=VOLUNTEER_RING_LOST`
+    /// （两句话不能混用）。信封另带 `orderId` 与 `until`（ISO 本地时间，= `ringingUntil`）；陪跑员端应放提示音并朗读 `ttsText`，
+    /// 循环到 `until`，任意操作即停。priority 为 HIGH，每次都同时发 APNs（`interruption-level=time-sensitive`）。同时写 `notification_logs`。
+    ///
+    /// 守卫顺序：归属（403）→ 状态（409）→ 限流（429）。被拒的请求**不占**限流配额。
+    /// 限流两道，都按订单（重派换人后从头算）：两次之间至少 10 秒（`Retry-After: 10`）；每单最多 20 次，第 21 次起 429。
+    /// **两个阶段各算各的，也与 `ring-runner` 互不占配额**。先判间隔再计数，10 秒内连按不消耗那 20 次。Redis 不可用时两道都放行。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/ring-volunteer`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)`.
+    func ringVolunteer(_ input: Operations.ringVolunteer.Input) async throws -> Operations.ringVolunteer.Output
     /// 跑后运动记录（订单双方可读）
     ///
     /// 订单 `COMPLETED` 之后，订单双方读同一条跑后记录（2026-09-24 新增，迁移 0047）。
@@ -2824,6 +2839,29 @@ extension APIProtocol {
         headers: Operations.ringRunner.Input.Headers = .init()
     ) async throws -> Operations.ringRunner.Output {
         try await ringRunner(Operations.ringRunner.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// 跑者让陪跑员的手机响铃（汇合期找人 / 陪跑中走散找人）
+    ///
+    /// （2026-11-25 新增，#1046；{@code ring-runner} 的反方向）角色 `BLIND`，且必须是**这一单的跑者**；
+    /// 在 `DRIVER_ARRIVED`（汇合期）与 `IN_PROGRESS`（陪跑中走散）可按，`DRIVER_EN_ROUTE`（陪跑员还在路上）不可。
+    /// 陪跑员收到 WS `APP_NOTIFICATION`：汇合期 `eventType=VOLUNTEER_RING`，陪跑中 `eventType=VOLUNTEER_RING_LOST`
+    /// （两句话不能混用）。信封另带 `orderId` 与 `until`（ISO 本地时间，= `ringingUntil`）；陪跑员端应放提示音并朗读 `ttsText`，
+    /// 循环到 `until`，任意操作即停。priority 为 HIGH，每次都同时发 APNs（`interruption-level=time-sensitive`）。同时写 `notification_logs`。
+    ///
+    /// 守卫顺序：归属（403）→ 状态（409）→ 限流（429）。被拒的请求**不占**限流配额。
+    /// 限流两道，都按订单（重派换人后从头算）：两次之间至少 10 秒（`Retry-After: 10`）；每单最多 20 次，第 21 次起 429。
+    /// **两个阶段各算各的，也与 `ring-runner` 互不占配额**。先判间隔再计数，10 秒内连按不消耗那 20 次。Redis 不可用时两道都放行。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/ring-volunteer`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)`.
+    public func ringVolunteer(
+        path: Operations.ringVolunteer.Input.Path,
+        headers: Operations.ringVolunteer.Input.Headers = .init()
+    ) async throws -> Operations.ringVolunteer.Output {
+        try await ringVolunteer(Operations.ringVolunteer.Input(
             path: path,
             headers: headers
         ))
@@ -9209,6 +9247,204 @@ public enum Components {
             }
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/chatPreference`.
             public var chatPreference: Components.Schemas.OrderDetailResponse.chatPreferencePayload?
+            /// 订单为什么结束（2026-11-25 新增，#1045）。只在终态有值；2026-11-25 之前结束的订单为 null。
+            ///
+            /// `status = COMPLETED`：
+            /// - `FINISHED_BLIND_CONFIRMED`：陪跑员点了结束，跑者确认已在安全的地方
+            /// - `FINISHED_BY_VOLUNTEER`：陪跑员结束（结束前确认关闭时的一步完成）
+            /// - `FINISHED_BY_VOLUNTEER_UNCONFIRMED`：陪跑员请求结束后跑者一直没确认，陪跑员到点单方面结束
+            /// - `FINISHED_BY_BLIND_VOLUNTEER_OFFLINE`：陪跑员手机长时间没有位置上报，跑者自己结束
+            /// - `AUTO_COMPLETED`：过了计划结束时间很久没人点结束，系统自动完成
+            /// - `CS_COMPLETED`：客服强制结束，记为完成
+            ///
+            /// `status = CANCELLED`：
+            /// - `BLIND_CANCELLED`：跑者取消
+            /// - `BLIND_CANCELLED_AFTER_ARRIVAL`：陪跑员标了已到达、等满时限没碰上面，跑者取消（不算陪跑员取消）
+            /// - `BLIND_NO_SHOW`：陪跑员到达后等满时限没等到跑者，陪跑员结束等待
+            /// - `MATCH_TIMEOUT`：一直没有陪跑员接单，等待次数用完后系统取消
+            /// - `REMATCH_LIMIT_REACHED`：陪跑员一再退出，重新匹配次数用完，系统取消
+            /// - `EMERGENCY_UNRESOLVED`：这一单的紧急求助长时间没有结案，过了计划结束时间后系统收尾（求助仍由客服处理）
+            /// - `CS_CANCELLED`：客服强制结束，记为取消
+            /// - `START_TIME_LONG_PASSED`：约定开跑时间过去很久陪跑仍没开始（多为服务停机后恢复），系统取消
+            /// - `SYSTEM_FORCE_CLOSED`：自动完成连续失败后的兜底终止；这一单实际可能跑完了
+            /// - `ACCOUNT_SUSPENDED`：跑者的账号被平台停用，名下还没碰面的订单被取消。只下发给跑者本人，陪跑员看到的是 `BLIND_CANCELLED`
+            ///
+            /// `status = NO_VOLUNTEER`：
+            /// - `DISPATCH_WINDOW_EXPIRED`：派单窗口到期，没有陪跑员接单
+            /// - `INTRO_CALL_WINDOW_TOO_SHORT`：距开跑已经不够打一轮接单前通话，不再找人
+            /// - `INTRO_CALL_FAILED_WINDOW_TOO_SHORT`：通话没谈成，距开跑不够再聊一轮
+            /// - `INTRO_CALL_ROUNDS_EXHAUSTED`：接单前通话聊满轮数仍没成单
+            /// - `START_TIME_LONG_PASSED`：约定开跑时间过去很久仍没找到人（多为服务停机后恢复），不再找人
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closeReason`.
+            public struct closeReasonPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closeReason/value1`.
+                @frozen public enum Value1Payload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case FINISHED_BLIND_CONFIRMED = "FINISHED_BLIND_CONFIRMED"
+                    case FINISHED_BY_VOLUNTEER = "FINISHED_BY_VOLUNTEER"
+                    case FINISHED_BY_VOLUNTEER_UNCONFIRMED = "FINISHED_BY_VOLUNTEER_UNCONFIRMED"
+                    case FINISHED_BY_BLIND_VOLUNTEER_OFFLINE = "FINISHED_BY_BLIND_VOLUNTEER_OFFLINE"
+                    case AUTO_COMPLETED = "AUTO_COMPLETED"
+                    case CS_COMPLETED = "CS_COMPLETED"
+                    case BLIND_CANCELLED = "BLIND_CANCELLED"
+                    case BLIND_CANCELLED_AFTER_ARRIVAL = "BLIND_CANCELLED_AFTER_ARRIVAL"
+                    case BLIND_NO_SHOW = "BLIND_NO_SHOW"
+                    case MATCH_TIMEOUT = "MATCH_TIMEOUT"
+                    case REMATCH_LIMIT_REACHED = "REMATCH_LIMIT_REACHED"
+                    case EMERGENCY_UNRESOLVED = "EMERGENCY_UNRESOLVED"
+                    case CS_CANCELLED = "CS_CANCELLED"
+                    case START_TIME_LONG_PASSED = "START_TIME_LONG_PASSED"
+                    case SYSTEM_FORCE_CLOSED = "SYSTEM_FORCE_CLOSED"
+                    case ACCOUNT_SUSPENDED = "ACCOUNT_SUSPENDED"
+                    case DISPATCH_WINDOW_EXPIRED = "DISPATCH_WINDOW_EXPIRED"
+                    case INTRO_CALL_WINDOW_TOO_SHORT = "INTRO_CALL_WINDOW_TOO_SHORT"
+                    case INTRO_CALL_FAILED_WINDOW_TOO_SHORT = "INTRO_CALL_FAILED_WINDOW_TOO_SHORT"
+                    case INTRO_CALL_ROUNDS_EXHAUSTED = "INTRO_CALL_ROUNDS_EXHAUSTED"
+                }
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closeReason/value1`.
+                public var value1: Components.Schemas.OrderDetailResponse.closeReasonPayload.Value1Payload?
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closeReason/value2`.
+                public var value2: Swift.String?
+                /// Creates a new `closeReasonPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2:
+                public init(
+                    value1: Components.Schemas.OrderDetailResponse.closeReasonPayload.Value1Payload? = nil,
+                    value2: Swift.String? = nil
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    var errors: [any Swift.Error] = []
+                    do {
+                        self.value1 = try decoder.decodeFromSingleValueContainer()
+                    } catch {
+                        errors.append(error)
+                    }
+                    do {
+                        self.value2 = try decoder.decodeFromSingleValueContainer()
+                    } catch {
+                        errors.append(error)
+                    }
+                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                        [
+                            self.value1,
+                            self.value2
+                        ],
+                        type: Self.self,
+                        codingPath: decoder.codingPath,
+                        errors: errors
+                    )
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
+                        self.value1,
+                        self.value2
+                    ])
+                }
+            }
+            /// 订单为什么结束（2026-11-25 新增，#1045）。只在终态有值；2026-11-25 之前结束的订单为 null。
+            ///
+            /// `status = COMPLETED`：
+            /// - `FINISHED_BLIND_CONFIRMED`：陪跑员点了结束，跑者确认已在安全的地方
+            /// - `FINISHED_BY_VOLUNTEER`：陪跑员结束（结束前确认关闭时的一步完成）
+            /// - `FINISHED_BY_VOLUNTEER_UNCONFIRMED`：陪跑员请求结束后跑者一直没确认，陪跑员到点单方面结束
+            /// - `FINISHED_BY_BLIND_VOLUNTEER_OFFLINE`：陪跑员手机长时间没有位置上报，跑者自己结束
+            /// - `AUTO_COMPLETED`：过了计划结束时间很久没人点结束，系统自动完成
+            /// - `CS_COMPLETED`：客服强制结束，记为完成
+            ///
+            /// `status = CANCELLED`：
+            /// - `BLIND_CANCELLED`：跑者取消
+            /// - `BLIND_CANCELLED_AFTER_ARRIVAL`：陪跑员标了已到达、等满时限没碰上面，跑者取消（不算陪跑员取消）
+            /// - `BLIND_NO_SHOW`：陪跑员到达后等满时限没等到跑者，陪跑员结束等待
+            /// - `MATCH_TIMEOUT`：一直没有陪跑员接单，等待次数用完后系统取消
+            /// - `REMATCH_LIMIT_REACHED`：陪跑员一再退出，重新匹配次数用完，系统取消
+            /// - `EMERGENCY_UNRESOLVED`：这一单的紧急求助长时间没有结案，过了计划结束时间后系统收尾（求助仍由客服处理）
+            /// - `CS_CANCELLED`：客服强制结束，记为取消
+            /// - `START_TIME_LONG_PASSED`：约定开跑时间过去很久陪跑仍没开始（多为服务停机后恢复），系统取消
+            /// - `SYSTEM_FORCE_CLOSED`：自动完成连续失败后的兜底终止；这一单实际可能跑完了
+            /// - `ACCOUNT_SUSPENDED`：跑者的账号被平台停用，名下还没碰面的订单被取消。只下发给跑者本人，陪跑员看到的是 `BLIND_CANCELLED`
+            ///
+            /// `status = NO_VOLUNTEER`：
+            /// - `DISPATCH_WINDOW_EXPIRED`：派单窗口到期，没有陪跑员接单
+            /// - `INTRO_CALL_WINDOW_TOO_SHORT`：距开跑已经不够打一轮接单前通话，不再找人
+            /// - `INTRO_CALL_FAILED_WINDOW_TOO_SHORT`：通话没谈成，距开跑不够再聊一轮
+            /// - `INTRO_CALL_ROUNDS_EXHAUSTED`：接单前通话聊满轮数仍没成单
+            /// - `START_TIME_LONG_PASSED`：约定开跑时间过去很久仍没找到人（多为服务停机后恢复），不再找人
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closeReason`.
+            public var closeReason: Components.Schemas.OrderDetailResponse.closeReasonPayload?
+            /// 订单是谁结束的（2026-11-25 新增，#1045）。
+            /// - `BLIND`：下单的跑者
+            /// - `VOLUNTEER`：这一单的陪跑员
+            /// - `SYSTEM`：系统自动结束（超时、没找到人、兜底收尾）
+            /// - `CS`：客服
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closedBy`.
+            public struct closedByPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closedBy/value1`.
+                @frozen public enum Value1Payload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case BLIND = "BLIND"
+                    case VOLUNTEER = "VOLUNTEER"
+                    case SYSTEM = "SYSTEM"
+                    case CS = "CS"
+                }
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closedBy/value1`.
+                public var value1: Components.Schemas.OrderDetailResponse.closedByPayload.Value1Payload?
+                /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closedBy/value2`.
+                public var value2: Swift.String?
+                /// Creates a new `closedByPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2:
+                public init(
+                    value1: Components.Schemas.OrderDetailResponse.closedByPayload.Value1Payload? = nil,
+                    value2: Swift.String? = nil
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    var errors: [any Swift.Error] = []
+                    do {
+                        self.value1 = try decoder.decodeFromSingleValueContainer()
+                    } catch {
+                        errors.append(error)
+                    }
+                    do {
+                        self.value2 = try decoder.decodeFromSingleValueContainer()
+                    } catch {
+                        errors.append(error)
+                    }
+                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                        [
+                            self.value1,
+                            self.value2
+                        ],
+                        type: Self.self,
+                        codingPath: decoder.codingPath,
+                        errors: errors
+                    )
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
+                        self.value1,
+                        self.value2
+                    ])
+                }
+            }
+            /// 订单是谁结束的（2026-11-25 新增，#1045）。
+            /// - `BLIND`：下单的跑者
+            /// - `VOLUNTEER`：这一单的陪跑员
+            /// - `SYSTEM`：系统自动结束（超时、没找到人、兜底收尾）
+            /// - `CS`：客服
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/closedBy`.
+            public var closedBy: Components.Schemas.OrderDetailResponse.closedByPayload?
             /// 查看者（本单陪跑员）和这位盲人**一起跑完过**几单（2026-09-25 新增，#352），口径同 NEW_ORDER / `AvailableOrderResponse` 的同名字段：`status = COMPLETED` 的单数，接了又取消的不算；本单已完成则包含本单。 🚨 **只对本单陪跑员下发，其他查看者（含盲人）恒为 `null`**。陪跑员视角下 `0` 照常下发： `0` = 第一次一起跑，`null` = 没给，两者在卡片上要说不同的话。
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/completedTogetherCount`.
@@ -9829,6 +10065,8 @@ public enum Components {
             ///   - blindPhone: 盲人手机号，**明文、可直接拨打**（供志愿者拨号），与 `volunteerPhone` 完全对称 ——
             ///   - blindSurname: （2026-09-26 新增，陪跑员端订单页 v2）跑者**姓氏**（如 `李`、复姓 `欧阳`），给陪跑员端标题 / 短标签 / 锁屏用。 **只在已接单时下发**（`volunteerId` 非 null 时），未接单、跑者没填姓名或已注销为 `null` —— 客户端改说「跑者」。 全名不下发；后端没有性别字段，**不要拼「先生 / 女士」**
             ///   - chatPreference:
+            ///   - closeReason: 订单为什么结束（2026-11-25 新增，#1045）。只在终态有值；2026-11-25 之前结束的订单为 null。
+            ///   - closedBy: 订单是谁结束的（2026-11-25 新增，#1045）。
             ///   - completedTogetherCount: 查看者（本单陪跑员）和这位盲人**一起跑完过**几单（2026-09-25 新增，#352），口径同 NEW_ORDER / `AvailableOrderResponse` 的同名字段：`status = COMPLETED` 的单数，接了又取消的不算；本单已完成则包含本单。 🚨 **只对本单陪跑员下发，其他查看者（含盲人）恒为 `null`**。陪跑员视角下 `0` 照常下发： `0` = 第一次一起跑，`null` = 没给，两者在卡片上要说不同的话。
             ///   - counterpartUserId: （2026-11-02 新增，#911）这一单的对方的用户 id，**只用来传给举报 `POST /api/reports` 的 `targetUserId` 和拉黑 `POST /api/users/{userId}/block`**，不要拿它拼展示文案或拨号。 盲人看到：订单上当前的陪跑员；单上没有陪跑员时，这一单**最后接过单或通话过**的陪跑员（接单后取消的人也在，这时 `volunteerId` 是 `null`）。陪跑员看到：盲人。 `null` = 这一单还没有人回应过，或对方已注销，客户端隐藏这两个入口。 非 `null` 时这两个端点不会因对象不符合条件返回 404。值不随任何一方的拉黑操作变化。
             ///   - createdAt:
@@ -9897,6 +10135,8 @@ public enum Components {
                 blindPhone: Swift.String? = nil,
                 blindSurname: Swift.String? = nil,
                 chatPreference: Components.Schemas.OrderDetailResponse.chatPreferencePayload? = nil,
+                closeReason: Components.Schemas.OrderDetailResponse.closeReasonPayload? = nil,
+                closedBy: Components.Schemas.OrderDetailResponse.closedByPayload? = nil,
                 completedTogetherCount: Swift.Int64? = nil,
                 counterpartUserId: Swift.Int64? = nil,
                 createdAt: Swift.String,
@@ -9965,6 +10205,8 @@ public enum Components {
                 self.blindPhone = blindPhone
                 self.blindSurname = blindSurname
                 self.chatPreference = chatPreference
+                self.closeReason = closeReason
+                self.closedBy = closedBy
                 self.completedTogetherCount = completedTogetherCount
                 self.counterpartUserId = counterpartUserId
                 self.createdAt = createdAt
@@ -10034,6 +10276,8 @@ public enum Components {
                 case blindPhone
                 case blindSurname
                 case chatPreference
+                case closeReason
+                case closedBy
                 case completedTogetherCount
                 case counterpartUserId
                 case createdAt
@@ -28716,6 +28960,316 @@ public enum Operations {
             /// - Throws: An error if `self` is not `.tooManyRequests`.
             /// - SeeAlso: `.tooManyRequests`.
             public var tooManyRequests: Operations.ringRunner.Output.TooManyRequests {
+                get throws {
+                    switch self {
+                    case let .tooManyRequests(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "tooManyRequests",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// 跑者让陪跑员的手机响铃（汇合期找人 / 陪跑中走散找人）
+    ///
+    /// （2026-11-25 新增，#1046；{@code ring-runner} 的反方向）角色 `BLIND`，且必须是**这一单的跑者**；
+    /// 在 `DRIVER_ARRIVED`（汇合期）与 `IN_PROGRESS`（陪跑中走散）可按，`DRIVER_EN_ROUTE`（陪跑员还在路上）不可。
+    /// 陪跑员收到 WS `APP_NOTIFICATION`：汇合期 `eventType=VOLUNTEER_RING`，陪跑中 `eventType=VOLUNTEER_RING_LOST`
+    /// （两句话不能混用）。信封另带 `orderId` 与 `until`（ISO 本地时间，= `ringingUntil`）；陪跑员端应放提示音并朗读 `ttsText`，
+    /// 循环到 `until`，任意操作即停。priority 为 HIGH，每次都同时发 APNs（`interruption-level=time-sensitive`）。同时写 `notification_logs`。
+    ///
+    /// 守卫顺序：归属（403）→ 状态（409）→ 限流（429）。被拒的请求**不占**限流配额。
+    /// 限流两道，都按订单（重派换人后从头算）：两次之间至少 10 秒（`Retry-After: 10`）；每单最多 20 次，第 21 次起 429。
+    /// **两个阶段各算各的，也与 `ring-runner` 互不占配额**。先判间隔再计数，10 秒内连按不消耗那 20 次。Redis 不可用时两道都放行。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/ring-volunteer`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)`.
+    public enum ringVolunteer {
+        public static let id: Swift.String = "ringVolunteer"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/path/id`.
+                public var id: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id:
+                public init(id: Swift.Int64) {
+                    self.id = id
+                }
+            }
+            public var path: Operations.ringVolunteer.Input.Path
+            /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ringVolunteer.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ringVolunteer.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ringVolunteer.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ringVolunteer.Input.Path,
+                headers: Operations.ringVolunteer.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.RunnerRingResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RunnerRingResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ringVolunteer.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ringVolunteer.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// 已受理。客户端在 `ringingUntil` 之前让按钮不可点。`delivered=false` 表示推送没发出去（例如服务端模板缺失），客户端应提示「对方可能没收到」。
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ringVolunteer.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ringVolunteer.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/403/content/application\/json`.
+                    case json(Components.Schemas.ApiErrorResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiErrorResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ringVolunteer.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ringVolunteer.Output.Forbidden.Body) {
+                    self.body = body
+                }
+            }
+            /// 非跑者角色，或不是这一单的跑者（`NOT_ORDER_PARTICIPANT`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.ringVolunteer.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.ringVolunteer.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct NotFound: Sendable, Hashable {
+                /// Creates a new `NotFound`.
+                public init() {}
+            }
+            /// 订单不存在
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Operations.ringVolunteer.Output.NotFound)
+            /// 订单不存在
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            public static var notFound: Self {
+                .notFound(.init())
+            }
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Operations.ringVolunteer.Output.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/ring-volunteer/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ApiErrorResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiErrorResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ringVolunteer.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ringVolunteer.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// 订单不在已到达或陪跑中（`ORDER_STATUS_NOT_ALLOWED`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ringVolunteer.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ringVolunteer.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct TooManyRequests: Sendable, Hashable {
+                /// Creates a new `TooManyRequests`.
+                public init() {}
+            }
+            /// 距上次不到 10 秒，或这一单这一阶段已响满 20 次（`TOO_MANY_REQUESTS`，响应头带 `Retry-After`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            case tooManyRequests(Operations.ringVolunteer.Output.TooManyRequests)
+            /// 距上次不到 10 秒，或这一单这一阶段已响满 20 次（`TOO_MANY_REQUESTS`，响应头带 `Retry-After`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/ring-volunteer/post(ringVolunteer)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            public static var tooManyRequests: Self {
+                .tooManyRequests(.init())
+            }
+            /// The associated value of the enum case if `self` is `.tooManyRequests`.
+            ///
+            /// - Throws: An error if `self` is not `.tooManyRequests`.
+            /// - SeeAlso: `.tooManyRequests`.
+            public var tooManyRequests: Operations.ringVolunteer.Output.TooManyRequests {
                 get throws {
                     switch self {
                     case let .tooManyRequests(response):

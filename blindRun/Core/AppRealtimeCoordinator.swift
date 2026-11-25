@@ -41,7 +41,7 @@ final class AppRealtimeCoordinator: ObservableObject {
 
     @Published var dispatchDiagnostic: WSDispatchDiagnostic?
     @Published var currentNotification: RealtimeForegroundNotification?
-    /// 陪跑员按了「让 TA 的手机响起来」。盲人端 `BlindRunnerTabView` 据此响铃，响完调 `dismissRunnerRing`。
+    /// 对方按了「让 TA 的手机响起来」。跑者端 `BlindRunnerTabView`、陪跑员端 `VolunteerTabView` 据此响铃（协调器按角色只发给对的一端），响完调 `dismissRunnerRing`。
     @Published var runnerRing: RunnerRingRequest?
     @Published var latestSeparationAlert: RealtimeSeparationAlert?
     @Published var latestSafetyEvent: RealtimeSafetyEvent?

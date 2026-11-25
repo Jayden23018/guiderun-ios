@@ -93,7 +93,11 @@ struct BlindRunnerTabView: View {
         .asksBlindForPushPermissionOnFirstOrder()
         // 协调器是 AppState 上的嵌套对象，改它不会让这一层重绘，只能订阅（记忆
         // `nested-observableobject-does-not-republish`）。重新订阅会回放当前值，控制器自己去重。
-        .onReceive(appState.realtimeCoordinator.$runnerRing) { ringController.handle($0) }
+        .onReceive(appState.realtimeCoordinator.$runnerRing) { ring in
+            // 与陪跑员端对称：只响跑者端的两种（协调器角色未绑定时可能放进来另一端的）。
+            guard ring?.kind.isForVolunteer != true else { return }
+            ringController.handle(ring)
+        }
         #if DEBUG
         .onChange(of: selection) { simulateSOSGestureForUITestIfNeeded(on: $0) }
         .onChange(of: scenePhase) { simulateSOSGestureOnResumeForUITestIfNeeded($0) }

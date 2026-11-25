@@ -256,6 +256,14 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
     ) {
         Task { @MainActor in
             let signedIn = self.appState?.isLoggedIn == true
+            // 跑者找陪跑员的响铃：WS 连着时那一条已经在响，推送前台不再呈现（#1023，免得出声两遍）；WS 没连着就照常呈现。
+            if signedIn, VolunteerRingPush.suppressesForeground(
+                notification.request.content.userInfo,
+                isWebSocketConnected: self.appState?.realtimeCoordinator.connectionState == .connected
+            ) {
+                completionHandler([])
+                return
+            }
             // 没人登录：一律不上屏（#459）。有人登录：新邀请交给 App 内卡片（#338），其余照常横幅 + 提示音。
             let options = signedIn
                 ? InviteNotificationActions.foregroundPresentationOptions(for: notification.request.content.userInfo)
@@ -287,6 +295,11 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
+        // 点开跑者找陪跑员的推送时响铃多半早过点了，补念「跑者在找你」是过期信息；还在窗口内的 WS 那条会自己响（#1023）。
+        if VolunteerRingPush.isRingEvent(userInfo) {
+            completionHandler()
+            return
+        }
         guard let request = InviteNotificationActions.request(actionIdentifier: response.actionIdentifier, userInfo: userInfo) else {
             speak(from: response.notification)
             completionHandler()
