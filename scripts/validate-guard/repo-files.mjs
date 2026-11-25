@@ -107,6 +107,19 @@ export const cases = [
     }
   },
   {
+    // 1C8F.1 只给有 App Group 的 App 用，本 App 没有 App Group。
+    name: '主 App 清单填 App Group 专用的 1C8F.1',
+    expect: 2,
+    input: {
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: '/x/blindRun/PrivacyInfo.xcprivacy',
+        old_string: 'a',
+        new_string: '<string>1C8F.1</string>'
+      }
+    }
+  },
+  {
     // 主 App 该用的对应项，必须放行 —— 否则这条规则会把正确修法一起拦掉。
     name: '主 App 清单填 App 可用的 C617.1',
     expect: 0,
