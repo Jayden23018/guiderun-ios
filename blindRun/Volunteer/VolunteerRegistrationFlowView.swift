@@ -798,8 +798,8 @@ final class VolunteerRegistrationViewModel: ObservableObject {
         }
         let previousStep = currentStep
         let localizedMessage = error.localizedMessage
-        // 一证一个志愿者（#768）：回到填身份证号的那一屏，原因写在那一屏上。
-        if case .serverError(let response) = error, response.errorCode == .idCardAlreadyRegistered {
+        // 一证一个志愿者（#768）、未满 18 周岁（#1010，不刷新状态、不让人核对证件）：回到身份证号那一屏，原因写在那一屏上。
+        if case .serverError(let response) = error, [.idCardAlreadyRegistered, .underageNotAllowed].contains(response.errorCode) {
             isLoading = false
             basicInfoPage = .identity
             errorMessage = localizedMessage

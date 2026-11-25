@@ -58,6 +58,7 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
     /// 而「补不到」本来就是这条路径的合法降级（志愿者没上报位置 / 资质未审核都返空数组）。
     var availableOrdersResult: Result<[AvailableOrderResponse], Error> = .success([])
     var pendingInvitesResult: Result<PendingInvitesResponse, Error> = .failure(NotStubbed(method: "pendingInvites"))
+    var lastCancelReason: OrderCancelReason?
     var cancelResult: Result<CancelOrderResponse, Error> = .failure(NotStubbed(method: "cancel"))
     var respondResult: Result<Void, Error> = .failure(NotStubbed(method: "respond"))
     var enRouteResult: Result<Void, Error> = .failure(NotStubbed(method: "enRoute"))
@@ -162,9 +163,11 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
     }
 
     @discardableResult
-    func cancel(orderId: Int64) async throws -> CancelOrderResponse {
-        record()
+    func cancel(orderId: Int64, reason: OrderCancelReason?) async throws -> CancelOrderResponse {
+        record("cancel(orderId:)") // 既有用例按这个名字数调用；加了 reason 参数后 `#function` 会变
+
         lastOrderId = orderId
+        lastCancelReason = reason
         return try cancelResult.get()
     }
 

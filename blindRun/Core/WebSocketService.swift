@@ -267,16 +267,6 @@ final class WebSocketService: ObservableObject {
         sendMessage(msg)
     }
 
-    static func connectionURL(baseURL: URL, token: String, role: WSRole) -> URL? {
-        var components = URLComponents()
-        components.scheme = baseURL.scheme == "https" ? "wss" : "ws"
-        components.host = baseURL.host
-        components.port = baseURL.port
-        components.path = role.path
-        components.queryItems = [URLQueryItem(name: "token", value: token)]
-        return components.url
-    }
-
     // MARK: - Connection Management
 
     private func performConnect() {
@@ -287,12 +277,12 @@ final class WebSocketService: ObservableObject {
         stopAllTasks()
         webSocketTask?.cancel(with: .goingAway, reason: nil)
 
-        guard let url = Self.connectionURL(baseURL: baseURL, token: token, role: role) else {
+        guard let request = Self.connectionRequest(baseURL: baseURL, token: token, role: role) else {
             connectionState = .disconnected
             return
         }
 
-        let task = session.webSocketTask(with: url)
+        let task = session.webSocketTask(with: request)
         webSocketTask = task
         task.resume()
         connectionState = .connecting

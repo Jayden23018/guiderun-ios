@@ -60,7 +60,7 @@ protocol OrderServing: Sendable {
     // 状态流转
     /// 盲人端不需要响应体，所以 `@discardableResult`；陪跑员端读 `countedAsLateCancel`。
     @discardableResult
-    func cancel(orderId: Int64) async throws -> CancelOrderResponse
+    func cancel(orderId: Int64, reason: OrderCancelReason?) async throws -> CancelOrderResponse
     func respond(orderId: Int64, action: OrderRespondAction) async throws
     func enRoute(orderId: Int64) async throws
     func arrived(orderId: Int64) async throws
@@ -128,6 +128,14 @@ protocol OrderServing: Sendable {
 /// 唯一的生产实现。**只做两件事**：选端点、转参数。
 ///
 /// 不做重试、不做缓存、不做错误分类 —— 那些属于调用方或 `APIClient`。
+extension OrderServing {
+    /// 不附原因的取消（全部现有调用点）。
+    @discardableResult
+    func cancel(orderId: Int64) async throws -> CancelOrderResponse {
+        try await cancel(orderId: orderId, reason: nil)
+    }
+}
+
 struct OrderService: OrderServing {
     let transport: any APIClientProtocol
 
@@ -177,9 +185,12 @@ struct OrderService: OrderServing {
         )
     }
 
+    /// `reason` 为 `nil` 时不发请求体，与加预设原因（backend#1055）之前完全一样。
     @discardableResult
-    func cancel(orderId: Int64) async throws -> CancelOrderResponse {
-        try await transport.send(OrderEndpoint.cancel(orderId: orderId).request)
+    func cancel(orderId: Int64, reason: OrderCancelReason?) async throws -> CancelOrderResponse {
+        let request = OrderEndpoint.cancel(orderId: orderId).request
+        guard let reason else { return try await transport.send(request) }
+        return try await transport.send(request, body: CancelOrderRequest(reason: reason))
     }
 
     func respond(orderId: Int64, action: OrderRespondAction) async throws {

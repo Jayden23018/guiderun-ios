@@ -256,6 +256,14 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
     ) {
         Task { @MainActor in
             let signedIn = self.appState?.isLoggedIn == true
+            // 收件人不是当前登录的人（backend#1018）：换人登录后、新账号换绑落地前，发给上一个账号的求助 / 走散 / 到达推送
+            // 还会送到这台手机。不上屏、不朗读，静默丢弃。
+            if signedIn, !PushRecipientGate.isForCurrentUser(
+                notification.request.content.userInfo, currentUserId: self.appState?.userId
+            ) {
+                completionHandler([])
+                return
+            }
             // 跑者找陪跑员的响铃：WS 连着时那一条已经在响，推送前台不再呈现（#1023，免得出声两遍）；WS 没连着就照常呈现。
             if signedIn, VolunteerRingPush.suppressesForeground(
                 notification.request.content.userInfo,
@@ -295,17 +303,22 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        // 点开跑者找陪跑员的推送时响铃多半早过点了，补念「跑者在找你」是过期信息；还在窗口内的 WS 那条会自己响（#1023）。
-        if VolunteerRingPush.isRingEvent(userInfo) {
-            completionHandler()
-            return
-        }
-        guard let request = InviteNotificationActions.request(actionIdentifier: response.actionIdentifier, userInfo: userInfo) else {
-            speak(from: response.notification)
-            completionHandler()
-            return
-        }
         Task { @MainActor in
+            // 点开的是发给上一个账号的推送：不补念（backend#1018）。邀请的锁屏操作同理不替别人回复。
+            if !PushRecipientGate.isForCurrentUser(userInfo, currentUserId: self.appState?.userId) {
+                completionHandler()
+                return
+            }
+            // 点开跑者找陪跑员的推送时响铃多半早过点了，补念「跑者在找你」是过期信息；还在窗口内的 WS 那条会自己响（#1023）。
+            if VolunteerRingPush.isRingEvent(userInfo) {
+                completionHandler()
+                return
+            }
+            guard let request = InviteNotificationActions.request(actionIdentifier: response.actionIdentifier, userInfo: userInfo) else {
+                self.speak(from: response.notification)
+                completionHandler()
+                return
+            }
             self.handleInviteAction(request)
             completionHandler()
         }
@@ -326,17 +339,19 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
         let content = notification.request.content
         let text = Self.speechText(userInfo: content.userInfo, fallbackBody: content.body)
         guard !text.isEmpty else { return }
-        Task { @MainActor in await self.announce(text) }
+        Task { @MainActor in await self.announce(text, userInfo: content.userInfo) }
     }
 
     /// 朗读推送，**只在有人登录时**（#459）：没人登录时收到或点开的只可能是上一个账号的。
     /// 冷启动点开通知时会话还在恢复，先等它恢复完再判，免得把本人的消息也吞掉（最多等 `restorationWait`）。
-    func announce(_ text: String, restorationWait: TimeInterval = 5) async {
+    func announce(_ text: String, userInfo: [AnyHashable: Any] = [:], restorationWait: TimeInterval = 5) async {
         let deadline = Date().addingTimeInterval(restorationWait)
         while appState?.sessionRestorationState == .restoring, Date() < deadline {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
         guard appState?.isLoggedIn == true else { return }
+        // 冷启动点开推送时会话恢复前没有 userId，入口那道比对放行了；恢复完再比一次（backend#1018）。
+        guard PushRecipientGate.isForCurrentUser(userInfo, currentUserId: appState?.userId) else { return }
         speechService?.speak(text)
     }
 
@@ -346,5 +361,27 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
             return ttsText
         }
         return fallbackBody.trimmed
+    }
+}
+
+/// 推送收件人比对（后端 #883 / backend#1018）。APNs 顶层（与 `aps` 同级）带 `recipientUserId`（int64）。
+///
+/// 只有它等于当前登录的 userId 才朗读 / 上屏；不等就静默丢弃。
+/// **缺键或解不出数字**（老后端、字段缺失）按原来的「有人登录才念」降级，不能因此把本人的推送吞掉。
+/// 当前没有 userId（未登录、会话恢复中）时不在这里判：「没人登录」另有一道闸。
+enum PushRecipientGate {
+    static func recipientUserId(_ userInfo: [AnyHashable: Any]) -> Int64? {
+        switch userInfo["recipientUserId"] {
+        case let value as Int64: return value
+        case let value as Int: return Int64(value)
+        case let value as NSNumber: return value.int64Value
+        case let value as String: return Int64(value)
+        default: return nil
+        }
+    }
+
+    static func isForCurrentUser(_ userInfo: [AnyHashable: Any], currentUserId: Int64?) -> Bool {
+        guard let recipient = recipientUserId(userInfo), let currentUserId else { return true }
+        return recipient == currentUserId
     }
 }

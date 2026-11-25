@@ -338,3 +338,22 @@ extension VolunteerRingTests {
         XCTAssertNil(model.notice)
     }
 }
+
+/// 推送收件人比对（backend#1018）：换人登录后，发给上一个账号的推送不能念给新登录的人。
+final class PushRecipientGateTests: XCTestCase {
+    func testPushForAnotherAccountIsDropped() {
+        XCTAssertFalse(PushRecipientGate.isForCurrentUser(["recipientUserId": 7], currentUserId: 9))
+        XCTAssertFalse(PushRecipientGate.isForCurrentUser(["recipientUserId": NSNumber(value: 7)], currentUserId: 9))
+    }
+
+    func testPushForCurrentAccountPasses() {
+        XCTAssertTrue(PushRecipientGate.isForCurrentUser(["recipientUserId": 9], currentUserId: 9))
+        XCTAssertTrue(PushRecipientGate.isForCurrentUser(["recipientUserId": Int64(9)], currentUserId: 9))
+    }
+
+    func testMissingOrUnreadableKeyFallsBackToSignedInRule() {
+        XCTAssertTrue(PushRecipientGate.isForCurrentUser(["aps": [:]], currentUserId: 9), "老后端没有这个键，照旧「有人登录才念」")
+        XCTAssertTrue(PushRecipientGate.isForCurrentUser(["recipientUserId": "oops"], currentUserId: 9))
+        XCTAssertTrue(PushRecipientGate.isForCurrentUser(["recipientUserId": 7], currentUserId: nil), "没有 userId 由「没人登录」那道闸管")
+    }
+}

@@ -181,14 +181,25 @@ final class LoginInputAndEnvironmentTests: XCTestCase, BlindRunTestSupport {
 
     func testWebSocketUsesFixedCloudHost() throws {
         let baseURL = try XCTUnwrap(APIEnvironment.demoCloud.baseURL)
-        let webSocketURL = try XCTUnwrap(WebSocketService.connectionURL(baseURL: baseURL, token: "jwt", role: .blind))
+        let request = try XCTUnwrap(WebSocketService.connectionRequest(baseURL: baseURL, token: "jwt", role: .blind))
+        let webSocketURL = try XCTUnwrap(request.url)
 
         // `wss` 没有独立的配置项，它是 `baseURL` 的 scheme 推导出来的
         // （`WebSocketService.connectionURL`）—— 所以这一条同时守着「WS 不许退回明文」。
         XCTAssertEqual(webSocketURL.scheme, "wss")
         XCTAssertEqual(webSocketURL.host, "blindrun.culiu-tech.com")
         XCTAssertEqual(webSocketURL.path, "/ws/blind")
-        XCTAssertTrue(webSocketURL.absoluteString.contains("token=jwt"))
+        // 后端 #881：token 只放请求头。有头时后端只认头，URL 里再带 `?token=` 既多余又会进代理日志。
+        XCTAssertFalse(webSocketURL.absoluteString.contains("token"))
+        XCTAssertNil(webSocketURL.query)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer jwt")
+    }
+
+    func testWebSocketVolunteerRequestCarriesTokenOnlyInHeader() throws {
+        let baseURL = try XCTUnwrap(APIEnvironment.demoCloud.baseURL)
+        let request = try XCTUnwrap(WebSocketService.connectionRequest(baseURL: baseURL, token: "t2", role: .volunteer))
+        XCTAssertEqual(request.url?.absoluteString, "wss://blindrun.culiu-tech.com/ws/volunteer")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer t2")
     }
 
     func testDebugEnvironmentSwitcherCyclesMockAndDemoCloud() {
