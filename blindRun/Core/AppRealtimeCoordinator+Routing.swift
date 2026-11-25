@@ -38,7 +38,7 @@ extension AppRealtimeCoordinator {
                         receivedAt: now()
                     )
                     activeOrderStatuses[message.orderId] = toStatus
-                    recentLifecycleStatusDates[toStatus] = update.receivedAt
+                    noteLifecycleUpdate(orderID: message.orderId, status: toStatus, at: update.receivedAt)
                     ClientFlowDiagnostics.record(event: "applied", operation: "order-status-event")
                     publishStatusUpdate(update)
                 }

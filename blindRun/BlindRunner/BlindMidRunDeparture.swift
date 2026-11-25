@@ -132,13 +132,13 @@ extension VoiceService {
     @discardableResult
     func speakBlindRunnerStatusChange(_ order: OrderDetailResponse, text: String) -> Bool {
         guard order.blindRunnerLeftAloneMidRun else {
-            return speakStatusChange(order.status, text: text)
+            return speakStatusChange(order.status, text: text, orderID: order.orderId)
         }
-        guard order.status != lastSpokenStatus else { return false }
+        guard !isDuplicateStatus(order.status, orderID: order.orderId) else { return false }
         if BlindMidRunDepartureRecord.shared.consumeAlert(orderID: order.orderId) {
-            markStatusAnnounced(order.status)
+            markStatusAnnounced(order.status, orderID: order.orderId)
             return false
         }
-        return speakStatusChange(order.status, text: text, priority: .alert)
+        return speakStatusChange(order.status, text: text, priority: .alert, orderID: order.orderId)
     }
 }

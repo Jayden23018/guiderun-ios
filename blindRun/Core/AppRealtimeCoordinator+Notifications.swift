@@ -40,7 +40,6 @@ extension AppRealtimeCoordinator {
         BlindMidRunDepartureRecord.shared.note(
             eventType: eventType, orderID: message.orderId ?? (activeOrderIDs.count == 1 ? activeOrderIDs.first : nil)
         )
-        if shouldSuppressLifecycleNotification(eventType: eventType) { return }
         let body = overriddenBody(forEventType: eventType) ?? message.body
         // 覆盖时**两条通道一起换**。只换屏幕上那行、让 `ttsText` 照念后端原文，
         // 等于让读屏用户听到的仍是「点击继续等待」——而这条覆盖存在的全部理由就是那句话。
@@ -56,6 +55,10 @@ extension AppRealtimeCoordinator {
             timestamp: message.timestamp,
             isSafetyEvent: Self.isSafetyEventType(eventType)
         )
+        if let status = Self.lifecycleStatus(forEventType: eventType),
+           deferOrSuppressLifecycleNotification(status: status, orderID: message.orderId, notification: notification, type: message.type) {
+            return
+        }
         enqueue(notification, type: message.type)
     }
 
@@ -149,28 +152,6 @@ extension AppRealtimeCoordinator {
             retainedOrderStatusIdentities.removeValue(forKey: expired)
         }
         return .process(messageID: rawMessageID)
-    }
-
-    /// 订单页自己会播状态变化，所以「跟状态变化说同一件事」的那几条通知不再重复播一遍。
-    ///
-    /// **判据是 `eventType`，不是正文文案。** 2026-08-09 之前这里匹配的是一张中文片段表
-    /// （「已接单」「重新匹配」……），代价是后端改任何一条模板的正文都会**静默**改变 iOS 的播报行为。
-    /// 它已经咬过一次：后端新增的 `REMATCH_ACCEPTED`（正文「已为您**重新匹配**志愿者{name}」）
-    /// 命中片段「重新匹配」被整条吞掉，而重匹配成功时用户必然有活跃订单 ——
-    /// 于是「换了个志愿者」这件事在 iOS 上一个字都没播出去。
-    ///
-    /// 顺带修掉的另一处：`ORDER_ACCEPTED` 的正文含「正在确认行程」，旧表把它同时算成
-    /// `.pendingAccept` 和 `.rematching` 两个状态。
-    ///
-    /// ⚠️ **未知 `eventType` 一律不抑制**（`lifecycleStatus` 返回 nil），这是有意的默认方向：
-    /// 后端加了新通知而这张表没跟上时，盲人**多听一遍**好过**一个字都听不到**。
-    private func shouldSuppressLifecycleNotification(eventType: String) -> Bool {
-        guard let status = Self.lifecycleStatus(forEventType: eventType) else { return false }
-        if !activeOrderIDs.isEmpty { return true }
-
-        let cutoff = now().addingTimeInterval(-lifecycleNotificationSuppressionWindow)
-        recentLifecycleStatusDates = recentLifecycleStatusDates.filter { $0.value >= cutoff }
-        return recentLifecycleStatusDates[status] != nil
     }
 
     private func routeEmergencyNotification(_ message: WSAppNotification, kind: RealtimeSafetyEvent.Kind) {
