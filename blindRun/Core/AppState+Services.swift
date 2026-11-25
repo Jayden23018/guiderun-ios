@@ -88,6 +88,12 @@ extension AppState {
         return OrderService(transport: apiClient)
     }
 
+    /// 消息历史片的领域 service。每次取都新建，理由同 `auth`。页面的 view model 自己收一个 service 参数，
+    /// 用例直接给它塞 `FakeNotificationHistoryService`，所以这里不留注入口。
+    var notificationHistory: any NotificationHistoryServing {
+        NotificationHistoryService(transport: apiClient)
+    }
+
     /// 志愿者线上培训片的领域 service。每次取都新建，理由同 `auth`。
     ///
     /// 没有注入口，理由同 `profile`：培训的用例都通过 `AppState(apiClient:)` 打桩，

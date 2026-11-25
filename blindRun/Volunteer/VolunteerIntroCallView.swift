@@ -109,7 +109,8 @@ struct VolunteerIntroCallView: View {
                     surface: .onDark,
                     onBack: { dismiss() },
                     isCloudHelp: VolunteerOrderSOSMode.resolve(status: .pendingIntroCall) == .cloud,
-                    onHelp: { showsLocalHelp = true }
+                    onHelp: { showsLocalHelp = true },
+                    messagesOrderId: route.orderId
                 ),
                 eyebrow: isAwaitingConfirmation ? IntroCallCopy.volunteerPlanSubmittedEyebrow : IntroCallCopy.pageTitle,
                 title: title(incoming: incoming),

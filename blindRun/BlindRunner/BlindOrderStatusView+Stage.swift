@@ -116,7 +116,8 @@ extension BlindOrderStatusView {
             onRepeatStatus: onRepeatStatus,
             menu: menu,
             sosMode: sosMode,
-            onHelp: { showSafetyHub = true }
+            onHelp: { showSafetyHub = true },
+            messagesOrderId: orderId
         )
     }
 

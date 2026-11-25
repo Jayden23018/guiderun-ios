@@ -385,6 +385,11 @@ extension MockAPIClient {
             return try handleUnregisterApnsToken(body: body)
         }
 
+        // 消息历史（#1025）：分页、倒序、可按订单过滤。
+        if path == "/api/notifications/history" && method == .get {
+            return try handleGetNotificationHistory(query: query)
+        }
+
         // 重连补读。后端要求 `after` 是 ISO-8601 字符串，传 epoch 会 400 INVALID_TIMESTAMP。
         if path == "/api/notifications/since" && method == .get {
             return try handleGetMissedNotifications(after: query?["after"])

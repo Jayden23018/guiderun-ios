@@ -86,13 +86,18 @@ struct BlindOrderTopBar: OrderV7TopBar {
     /// 求助中心底部那条走云端还是本地拨号。**只决定胶囊的样子**，点下去一律打开求助与安全中心。
     let sosMode: BlindHomeSOSMode
     let onHelp: () -> Void
+    /// 非 nil = 「···」末尾加「这一单的消息」（#1025），点开是这一单的消息历史。
+    /// 跑步中那一幕传 nil：那一屏刻意没有「···」（防误触，`AccessibilityAuditTests+UserSafety.swift` 里「跑步中顶栏不该有「···」」那条断言守着）。
+    /// 状态由顶栏自己持有，宿主不用多一个 `@State`：订单页那个文件已超长，行数棘轮不许再变大。
+    var messagesOrderId: Int64?
+    @State private var showsOrderMessages = false
 
     var body: some View {
         HStack(spacing: 4) {
             backButton
             Spacer(minLength: 0)
             repeatButton
-            if !menu.isEmpty {
+            if !menu.isEmpty || messagesOrderId != nil {
                 moreMenu
             }
             BlindOrderHelpPill(surface: surface, isCloud: sosMode == .cloudTrigger, action: onHelp)
@@ -100,6 +105,11 @@ struct BlindOrderTopBar: OrderV7TopBar {
         .padding(.horizontal, 8)
         // 整条栏对读屏是一组，顺序就是视觉顺序：返回 → 喇叭 → ··· → 求助。
         .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showsOrderMessages) {
+            if let messagesOrderId {
+                NotificationHistorySheet(orderId: messagesOrderId)
+            }
+        }
     }
 
     // MARK: 返回
@@ -138,11 +148,15 @@ struct BlindOrderTopBar: OrderV7TopBar {
                 }
                 .modifier(BlindOrderMenuItemIdentifier(kind: item.kind))
             }
+            if messagesOrderId != nil {
+                Button(NotificationHistoryCopy.orderTitle) { showsOrderMessages = true }
+                    .accessibilityIdentifier("blindOrderMenuOrderMessages")
+            }
         } label: {
             roundLabel(systemImage: "ellipsis")
         }
         .accessibilityLabel("更多操作")
-        .accessibilityHint(menu.map(\.title).joined(separator: "、"))
+        .accessibilityHint((menu.map(\.title) + (messagesOrderId == nil ? [] : [NotificationHistoryCopy.orderTitle])).joined(separator: "、"))
         .accessibilityIdentifier("blindOrderTopBarMoreMenu")
     }
 

@@ -42,6 +42,10 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
     let isCloudHelp: Bool
     var isHelpBusy = false
     let onHelp: () -> Void
+    /// 非 nil = 「···」末尾加「这一单的消息」（#1025），点开是这一单的消息历史。
+    /// 跑步中那一页（`VolunteerRunningPage`）不传：与盲人端同一条，那一屏不添「···」。
+    var messagesOrderId: Int64?
+    @State private var showsOrderMessages = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -49,7 +53,7 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
                 backButton
             }
             Spacer(minLength: 0)
-            if !menu.isEmpty || counterpartSafety != nil {
+            if !menu.isEmpty || counterpartSafety != nil || messagesOrderId != nil {
                 moreMenu
             }
             VolunteerOrderHelpPill(surface: surface, isCloud: isCloudHelp, isBusy: isHelpBusy, action: onHelp)
@@ -58,6 +62,11 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
         .frame(minHeight: BlindOrderTopBarMetrics.hitSize)
         // 读屏顺序就是视觉顺序：返回 → ··· → 求助。
         .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showsOrderMessages) {
+            if let messagesOrderId {
+                NotificationHistorySheet(orderId: messagesOrderId)
+            }
+        }
     }
 
     /// 两种表面都是同一枚圆形 ‹（#971，负责人 2026-11-12 批准）：原来深色头上是「‹ 返回」文字键。
@@ -89,6 +98,10 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
             if let counterpartSafety {
                 CounterpartSafetyMenuItems(viewModel: counterpartSafety)
             }
+            if messagesOrderId != nil {
+                Button(NotificationHistoryCopy.orderTitle) { showsOrderMessages = true }
+                    .accessibilityIdentifier("volunteerOrderMenuOrderMessages")
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 18, weight: .semibold))
@@ -104,7 +117,9 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
     }
 
     private var menuTitles: [String] {
-        menu.map(\.title) + (counterpartSafety.map { CounterpartSafetyMenu.titles(viewModel: $0) } ?? [])
+        menu.map(\.title)
+            + (counterpartSafety.map { CounterpartSafetyMenu.titles(viewModel: $0) } ?? [])
+            + (messagesOrderId == nil ? [] : [NotificationHistoryCopy.orderTitle])
     }
 
     @ViewBuilder

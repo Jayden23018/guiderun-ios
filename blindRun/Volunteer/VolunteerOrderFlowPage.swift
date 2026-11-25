@@ -108,7 +108,8 @@ struct VolunteerOrderFlowPage<Footer: View>: View {
             menu: menuItems,
             counterpartSafety: counterpartSafety,
             isCloudHelp: presentation.helpMode == .cloud,
-            onHelp: openHelp
+            onHelp: openHelp,
+            messagesOrderId: order?.orderId
         )
     }
 
