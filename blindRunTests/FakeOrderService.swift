@@ -65,7 +65,8 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
     /// 让「已到达」的请求在路上停一会儿：测「请求在路上时这一单被转走」（#456）。
     var arrivedDelayNanoseconds: UInt64 = 0
     var startServiceResult: Result<Void, Error> = .failure(NotStubbed(method: "startService"))
-    var finishResult: Result<Void, Error> = .failure(NotStubbed(method: "finish"))
+    var finishResult: Result<FinishOrderResponse, Error> = .failure(NotStubbed(method: "finish"))
+    var confirmSafeResult: Result<Void, Error> = .failure(NotStubbed(method: "confirmSafe"))
     var confirmDepartureResult: Result<Void, Error> = .failure(NotStubbed(method: "confirmDeparture"))
     var quickMessageResult: Result<OrderNudgeResponse, Error> = .failure(NotStubbed(method: "sendQuickMessage"))
     var ringRunnerResult: Result<OrderNudgeResponse, Error> = .failure(NotStubbed(method: "ringRunner"))
@@ -193,7 +194,7 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
         return try startServiceResult.get()
     }
 
-    func finish(orderId: Int64) async throws {
+    func finish(orderId: Int64) async throws -> FinishOrderResponse {
         record()
         lastOrderId = orderId
         return try finishResult.get()
@@ -335,5 +336,14 @@ extension FakeOrderService {
     func pendingInvites() async throws -> PendingInvitesResponse {
         record()
         return try pendingInvitesResult.get()
+    }
+}
+
+// 放在扩展里：类体已到 SwiftLint 的 250 行上限。
+extension FakeOrderService {
+    func confirmSafe(orderId: Int64) async throws {
+        record()
+        lastOrderId = orderId
+        return try confirmSafeResult.get()
     }
 }

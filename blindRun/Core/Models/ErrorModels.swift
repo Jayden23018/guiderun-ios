@@ -154,9 +154,9 @@ enum ErrorCode: String, Codable, Sendable {
     // 「开始陪跑」的两道 409（后端 #307 ①，迁移 0046），客户端要**分开处理**：
     // `SERVICE_START_TOO_EARLY`：距约定开跑还有超过 `start-service-earliest-minutes`，纯时间问题。
     case serviceStartTooEarly = "SERVICE_START_TOO_EARLY"
-    // `BLIND_CONFIRMATION_PENDING`：盲人还没点头。⚠️ 不是死锁（约定开跑 + 宽限后可单方面开始），
-    // 页面据此显示「等待对方确认」，**不置灰按钮** —— 对方随时可能点。
+    // `BLIND_CONFIRMATION_PENDING`：盲人还没点头。不是死锁（开跑 + 宽限后可单方面开始），**不置灰按钮**。
     case blindConfirmationPending = "BLIND_CONFIRMATION_PENDING"
+    case blindSafetyConfirmationPending = "BLIND_SAFETY_CONFIRMATION_PENDING" // 结束这一头的同类码（#902）：跑者还没确认安全
     // 通话后的见面安排单（后端 #755 / #757，2026-10-15）。文案在 `IntroCallMeetupCopy`，取自视觉稿 v2。
     //
     // 🚩 `INTRO_CALL_PLAN_STALE` **不是错误**：盲人确认时陪跑员又改了一版。它在服务层就被接住，
@@ -189,8 +189,8 @@ enum ErrorCode: String, Codable, Sendable {
     var prefersServerMessage: Bool {
         switch self {
         case .blindCancelTooEarly, .accountSuspended, .supportTicketLimitExceeded: return true
-        // 四个时间类码（#659）：后端 `OrderLifecycleService` 的 message 带最早可操作的时刻，本地文案说不出。
-        case .departureTooEarly, .serviceStartTooEarly, .endWaitTooEarly, .blindConfirmationPending: return true
+        // 时间类码（#659、#902）：后端 `OrderLifecycleService` 的 message 带最早可操作的时刻，本地文案说不出。
+        case .departureTooEarly, .serviceStartTooEarly, .endWaitTooEarly, .blindConfirmationPending, .blindSafetyConfirmationPending: return true
         case .orderServiceNotOpen, .orderOutsideOpenArea, .appointmentOutsideDutyHours: return true
         // 契约（#524）：收藏自己拉黑的人时 message 是「你已拉黑对方，请先解除」，本地文案说不出这句。
         case .favoriteVolunteerNotEligible: return true
@@ -369,9 +369,9 @@ enum ErrorCode: String, Codable, Sendable {
         case .serviceStartTooEarly:
             // 不说「到点按钮会亮」：后端没有结构化的最早可操作时刻字段，按钮不会自己变。
             return "还没到可以开始跑步的时间，请稍后再按。"
-        case .blindConfirmationPending:
-            // 说出跑者那一端的按钮名：两人此刻站在一起，陪跑员可以直接告诉对方按哪个。
+        case .blindConfirmationPending: // 说出跑者那一端的按钮名：两人站在一起，陪跑员可以直接告诉对方按哪个
             return "还需要跑者在手机上按「开始跑步」。可以请对方按一下，或稍等再试。"
+        case .blindSafetyConfirmationPending: return FinishSafetyCopy.pendingFallback
         case .introCallPlanStale:
             return IntroCallMeetupCopy.planChangedRelisten
         case .introCallPlanRequired:

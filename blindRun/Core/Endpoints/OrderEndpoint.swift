@@ -40,6 +40,8 @@ enum OrderEndpoint {
     case arrived(orderId: Int64)
     case startService(orderId: Int64)
     case finish(orderId: Int64)
+    /// 跑者确认已在安全的地方，结束陪跑（后端 #902）。陪跑员请求结束之后才开放，见 `FinishSafetyConfirmation.swift`。
+    case confirmSafe(orderId: Int64)
 
     /// 跨天预约单的临期闸门：志愿者表示「我还会去」，`SCHEDULED_CONFIRMED → PENDING_ACCEPT`。
     ///
@@ -109,6 +111,8 @@ enum OrderEndpoint {
             return EndpointRequest(.post, "/api/orders/\(orderId)/start-service")
         case .finish(let orderId):
             return EndpointRequest(.post, "/api/orders/\(orderId)/finish")
+        case .confirmSafe(let orderId):
+            return EndpointRequest(.post, "/api/orders/\(orderId)/confirm-safe")
         case .confirmDeparture(let orderId):
             return EndpointRequest(.post, "/api/orders/\(orderId)/confirm-departure")
         case .quickMessage(let orderId):

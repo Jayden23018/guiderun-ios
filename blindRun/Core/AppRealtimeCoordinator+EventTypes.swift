@@ -16,7 +16,12 @@ extension AppRealtimeCoordinator {
     static let orderRefreshingEventTypes: Set<String> = [
         "DEPART_REMINDER", "RUNNER_AT_MEETING_POINT", "RUNNER_MESSAGE_UPDATED", "ORDER_WAIT_ENDED",
         "RUN_RHYTHM", "RUN_PAUSED", "RUN_RESUMED", "RUNNER_BATTERY_LOW",
+        // 陪跑员请求结束（#902）：订单仍是 `IN_PROGRESS`、没有状态推送，确认按钮靠重拉后的 `finishRequestedAt` 出现。
+        finishSafetyConfirmRequestedEventType,
     ]
+
+    /// 陪跑员请求结束、请跑者确认安全（后端 #902）。只发给跑者。
+    static let finishSafetyConfirmRequestedEventType = "FINISH_SAFETY_CONFIRM_REQUESTED"
 
     /// 只刷新、不进横幅的事件。`RUN_RHYTHM`：跑步页的节奏卡原地变黄就是它的唯一呈现
     /// （交付包 08 §三「不另外弹横幅，同一时刻这个信号只在一处出现」）。
@@ -94,7 +99,9 @@ extension AppRealtimeCoordinator {
              "ORDER_ARRIVAL_STALLED",
              "ORDER_VOLUNTEER_LOST",
              "EMERGENCY_UNATTENDED",
-             "EMERGENCY_CONTACT_RECEIPT_TIMEOUT":
+             "EMERGENCY_CONTACT_RECEIPT_TIMEOUT",
+             // 跑者此刻多半手机在臂包里、不在订单页：按安全提醒抢占播报（#1016）。不进生命周期那张表，理由见上。
+             finishSafetyConfirmRequestedEventType:
             return true
         default:
             return false

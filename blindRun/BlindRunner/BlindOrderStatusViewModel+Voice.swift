@@ -78,6 +78,10 @@ extension BlindOrderStatusViewModel {
             if canShowKeepWaiting {
                 announcement += " " + KeepWaitingCopy.repeatStatusSuffix
             }
+            // 同一条理由：确认安全的按钮也只有在这里被念到才会被发现（#902）。
+            if order.isAwaitingBlindSafetyConfirmation {
+                announcement += " " + FinishSafetyCopy.blindStatusSuffix
+            }
             // 陪跑中与已完成屏幕上那三个数字**只有这一条通道能听全**：它们是 `Text`，
             // 读屏要逐个滑过去才念，而「重复当前状态」/「播报当前数据」是盲人按一下就听全的入口。
             // 用播报口径（`distanceText` 等）而不是屏幕口径 —— `9'06"` 会被念成「九撇零六引号」。

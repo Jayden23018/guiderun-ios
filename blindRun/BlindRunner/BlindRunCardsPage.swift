@@ -102,6 +102,8 @@ struct BlindRunCardsPage<TopBar: View, Cards: View, Footer: View>: View {
     let bottom: OrderFlowBottomActions
     /// 点卡片下面的空白 = 按一次主按钮（陪跑中「听当前状态」）。`nil` = 空白不可点。
     var onTapBlank: (() -> Void)?
+    /// 陪跑员请求结束、在等跑者确认安全时的确认卡（#902）。排在彩色卡前面，读屏从标题往下第一个就是它。
+    var finishSafetyCard: BlindFinishSafetyCard?
     /// 彩色卡下面的卡片（已完成：路线、陪跑员、评价、本月累计）。
     @ViewBuilder let cards: () -> Cards
     /// 「刚才那一下的结果」、Mock 调试区。
@@ -110,6 +112,7 @@ struct BlindRunCardsPage<TopBar: View, Cards: View, Footer: View>: View {
     var body: some View {
         // 骨架与陪跑员端跑步中 / 跑完了共用（`RunCardsScaffold`，#972）。
         RunCardsScaffold(gap: gap, topBar: topBar, bottom: bottom, onTapBlank: onTapBlank, header: header) {
+            if let finishSafetyCard { finishSafetyCard }
             BlindRunHeroCard(stats: stats, isFinished: isFinished)
                 .accessibilityIdentifier("blindRunCardsHero")
             if !isFinished {

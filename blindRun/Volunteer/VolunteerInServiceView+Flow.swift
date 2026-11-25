@@ -33,7 +33,8 @@ extension VolunteerInServiceView {
                 // 同跑步中求助面板那一行（`VolunteerRunHelpPanel`）：响铃中、登录过期时不可点。
                 isRinging: (viewModel.ringingUntil ?? .distantPast) > context.date,
                 isRingEnabled: !appState.isSessionExpiryDeferred,
-                onRing: { Task { await viewModel.ringRunner() } }
+                onRing: { Task { await viewModel.ringRunner() } },
+                finishSafety: VolunteerFinishSafetyNotice.resolve(order: order, now: context.date)
             ) {
                 emergencySection(for: order)
                 // 跑步中求助面板能按「让对方手机响」（后端 #445），失败或没送到要看得见。

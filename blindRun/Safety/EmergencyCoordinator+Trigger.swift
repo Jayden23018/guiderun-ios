@@ -52,7 +52,7 @@ extension EmergencyCoordinator {
 
         // Re-check eligibility against canonical order state at send time. Stale screen state or a
         // WebSocket event must never widen this.
-        guard let role, order.status.canTriggerEmergency(as: role) else {
+        guard let role, order.canTriggerEmergency(as: role) else {
             return finish(.failed("当前订单状态不能发起求助"))
         }
         // 排在取定位之前：凭证已过期就别让人再等 5 秒定位，然后才听到发不出去。

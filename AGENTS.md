@@ -179,7 +179,7 @@ DRIVER_EN_ROUTE  DRIVER_ARRIVED  COMPLETED  CANCELLED  REMATCHING  NO_VOLUNTEER
 ## 6. 求助 / SOS 红线
 
 - 求助**不是**订单状态。`POST /api/emergency/trigger` 只记录事件，订单状态不变。
-- **两端云端求助只在 `IN_PROGRESS` 开放**（产品决策，不是技术约束）。其余任何状态的入口一律降级为**本地拨号**（主紧急联系人 / **120** / 110），**绝不调 `/api/emergency/trigger`**；文案说清「App 不会代你发送求助」，弹窗标题叫「紧急呼叫」。
+- **两端云端求助只在 `IN_PROGRESS` 开放**（产品决策，不是技术约束）。其余任何状态的入口一律降级为**本地拨号**（主紧急联系人 / **120** / 110），**绝不调 `/api/emergency/trigger`**；文案说清「App 不会代你发送求助」，弹窗标题叫「紧急呼叫」。唯一例外：跑者完成后、后端下发的 `postFinishSosUntil` 之前，求助仍走云端挂在这一单上（#1016，判据 `OrderDetailResponse.canTriggerEmergency(as:now:)`）。
 - **新增求助入口必须读那一端的判定，不许自己判状态**：`BlindHomeSOSMode.resolve` / `VolunteerOrderSOSMode.resolve`（现有三处入口见 skill）。
 - **志愿者不得拥有「误触」按钮**（他可能就是威胁来源，后端 403 `EMERGENCY_VOLUNTEER_CANNOT_DISMISS`）；撤销权只在受助者本人（`PUT /api/emergency/{id}/cancel`）和客服。
 - **App 永远不得宣称短信已发出、已送达，或家属/联系人已被通知**（短信事务后异步发，失败不回告）；用进行时文案覆盖后端 body，`联系人已收到短信` 不得进发布产物。

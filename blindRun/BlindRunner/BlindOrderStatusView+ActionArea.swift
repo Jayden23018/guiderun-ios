@@ -131,8 +131,8 @@ extension BlindOrderStatusView {
                             await viewModel.runMockCounterpartSteps([.finish], orderId: order.orderId)
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("模拟服务完成")
+                    .buttonStyle(.bordered).accessibilityLabel("模拟服务完成")
+                    mockFinishSafetyControls(order)
                 }
             }
             .padding()
@@ -142,6 +142,31 @@ extension BlindOrderStatusView {
         }
         #endif
     }
+
+    #if DEBUG
+    /// 确认安全闸（#902）：Mock 默认关，与线上一致。打开后「模拟陪跑员请求结束」只记请求，跑步页出现确认按钮。
+    /// 单独成函数：`debugMockControls` 已到 SwiftLint 函数长度上限。
+    @ViewBuilder
+    private func mockFinishSafetyControls(_ order: OrderDetailResponse) -> some View {
+        Button("切换 Mock 确认安全闸") {
+            let isOpen = (appState.sessionUnawareAPIClient as? MockAPIClient)?.toggleFinishSafetyGateForTesting()
+            viewModel.errorMessage = "Mock 确认安全闸：\(isOpen == true ? "开（10 分钟）" : "关")"
+        }
+        .buttonStyle(.bordered)
+        Button("模拟陪跑员请求结束") {
+            do {
+                _ = try (appState.sessionUnawareAPIClient as? MockAPIClient)?
+                    .simulateVolunteerFinishForTesting(orderId: order.orderId)
+            } catch let error as APIError {
+                viewModel.errorMessage = "Mock 状态测试失败：\(error.localizedMessage)"
+            } catch {
+                viewModel.errorMessage = "Mock 状态测试失败。"
+            }
+            viewModel.startPolling(orderId: order.orderId)
+        }
+        .buttonStyle(.bordered)
+    }
+    #endif
 
     /// **只读退路**（`.unknown` 与终态）那条常驻底栏：「问一句」+「重复当前状态」。
     ///

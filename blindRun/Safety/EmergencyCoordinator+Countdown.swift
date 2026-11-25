@@ -40,7 +40,7 @@ extension EmergencyCoordinator {
     ) {
         // 与 `trigger` 同一道重复提交保护：倒计时期间再按一下不该叠出第二个倒计时。
         guard !state.isBusy else { return }
-        guard let role, order.status.canTriggerEmergency(as: role) else {
+        guard let role, order.canTriggerEmergency(as: role) else {
             state = .failed("当前订单状态不能发起求助")
             return
         }

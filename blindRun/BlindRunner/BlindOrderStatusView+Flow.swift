@@ -141,6 +141,9 @@ extension BlindOrderStatusView {
             bottom: mapTrackingBottom(presentation, order: order),
             // 只有陪跑中把空白也算作主按钮：「听当前状态」按错了没有后果，「完成」会离开页面。
             onTapBlank: isFinished ? nil : { handleFlowPrimaryAction(presentation, order: order) },
+            finishSafetyCard: order.isAwaitingBlindSafetyConfirmation
+                ? BlindFinishSafetyCard(isConfirming: viewModel.isPerformingAction) { Task { await viewModel.confirmSafe() } }
+                : nil,
             cards: {
                 if isFinished {
                     BlindRunFinishedCards(order: order, track: trackViewModel.track)
