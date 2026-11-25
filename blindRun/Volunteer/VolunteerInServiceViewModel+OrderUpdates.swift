@@ -15,12 +15,7 @@ extension VolunteerInServiceViewModel {
     func apply(_ updated: OrderDetailResponse, speakChanges: Bool) -> Bool {
         let previousStatus = order?.status
         var spoke = false
-        let previousOrder = order
-        order = updated
-        // 跑者留言变了：念一次（推送正文里没有留言，#1012）。
-        if speakChanges, let sentence = VolunteerRunnerMessage.announcement(previous: previousOrder, current: updated) {
-            speechService?.speak(sentence)
-        }
+        replaceOrder(with: updated, speakingMessageChange: speakChanges)
         // 状态一变就清掉两样只属于上一状态的东西：
         // - 响铃 / 快捷消息的回执：跑步页也渲染它，免得汇合期那句「对方可能没收到」挂到跑步中。
         //   它从不随状态切换一起写，清了不会吞掉新报的话。

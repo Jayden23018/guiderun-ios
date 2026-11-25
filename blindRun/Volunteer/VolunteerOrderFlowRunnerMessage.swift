@@ -49,3 +49,35 @@ extension VolunteerOrderPhase {
         }
     }
 }
+
+extension VolunteerOrderFlowCopy {
+    /// 取消确认框的后果句。已到达（#1012）：跑者正在集合点等，要说清他会被告知。
+    static func cancelMessage(for status: RunOrderStatus?) -> String {
+        switch status {
+        case .scheduledConfirmed, .pendingAccept, .driverEnRoute:
+            return "此订单将转给其他陪跑员，之后不一定还能接回来。"
+        case .driverArrived:
+            return "此订单将转给其他陪跑员，跑者会被告知。"
+        default:
+            return "此订单将转给其他陪跑员。"
+        }
+    }
+}
+
+extension VolunteerOrderFlowPresentation {
+    /// 约好 / 出发两屏信息块的开头：跑者、电话（有才出）、跑者留言（有才出）。
+    static func runnerPhoneAndMessageRows(order: OrderDetailResponse) -> [Row] {
+        [runnerRow(order: order), phoneRow(order: order), VolunteerRunnerMessage.row(order: order)].compactMap { $0 }
+    }
+}
+
+extension VolunteerInServiceViewModel {
+    /// 换上新订单；跑者留言变了就念一次（推送正文里没有留言，#1012）。
+    func replaceOrder(with updated: OrderDetailResponse, speakingMessageChange: Bool) {
+        let previous = order
+        order = updated
+        if speakingMessageChange, let sentence = VolunteerRunnerMessage.announcement(previous: previous, current: updated) {
+            speechService?.speak(sentence)
+        }
+    }
+}

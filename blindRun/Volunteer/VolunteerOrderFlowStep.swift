@@ -292,18 +292,6 @@ enum VolunteerOrderFlowCopy {
         )
     }
 
-    /// 已到达（#1012）：跑者正在集合点等，取消的后果里要说清他会被告知。
-    static func cancelMessage(for status: RunOrderStatus?) -> String {
-        switch status {
-        case .scheduledConfirmed, .pendingAccept, .driverEnRoute:
-            return "此订单将转给其他陪跑员，之后不一定还能接回来。"
-        case .driverArrived:
-            return "此订单将转给其他陪跑员，跑者会被告知。"
-        default:
-            return "此订单将转给其他陪跑员。"
-        }
-    }
-
     private static func isWithinLateCancelWindow(plannedStart: Date?, windowHours: Int, now: Date) -> Bool {
         guard let plannedStart else { return false }
         let remaining = plannedStart.timeIntervalSince(now)
@@ -742,10 +730,7 @@ struct VolunteerOrderFlowPresentation: Equatable {
         }
         guard step == .booked || step == .departed else { return nil }
 
-        var rows: [Row] = [runnerRow(order: order)]
-        if let phoneRow = phoneRow(order: order) { rows.append(phoneRow) }
-
-        if let message = VolunteerRunnerMessage.row(order: order) { rows.append(message) }
+        var rows = runnerPhoneAndMessageRows(order: order)
 
         if order.status.disclosesBlindRunnerNotesToVolunteer {
             // 🔴 标签保留 `路线备注` / `特殊说明`，**不按设计稿合并成「引导习惯」**。
@@ -892,7 +877,7 @@ struct VolunteerOrderFlowPresentation: Equatable {
     /// 姓名**视觉上保留掩码**（`李*`）、**朗读去掉星号** —— 后端的姓名始终带掩码
     /// （契约逐字「不存在明文版本」），原样交给 VoiceOver 会念成「李星号」，
     /// 而陪跑员端的读屏同样是外放的。设计稿写的「接下后显示李明的全名」做不到。
-    private static func runnerRow(order: OrderDetailResponse) -> Row {
+    static func runnerRow(order: OrderDetailResponse) -> Row {
         let name = order.blindName?.nilIfBlank ?? VolunteerOrderFlowCopy.unknownRunnerName
         let needs = order.escortNeeds.map(\.value).joined(separator: "，").nilIfBlank
         return Row(
