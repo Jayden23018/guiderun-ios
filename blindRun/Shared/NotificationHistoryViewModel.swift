@@ -30,9 +30,13 @@ final class NotificationHistoryViewModel: ObservableObject {
     /// nil = 全部消息；非 nil = 订单页「这一单的消息」。
     let orderId: Int64?
 
-    /// 每次从头加载加一。翻页请求回来时拿它对账：期间用户下拉刷新过，就丢掉这批旧页，
+    /// 每次**从头加载成功**加一。翻页请求回来时拿它对账：期间列表被刷新换过，就丢掉这批旧页，
     /// 否则旧列表的第 2 页会接在新列表的第 1 页后面。
+    /// 只在成功时加：刷新失败时列表没换，在飞的翻页结果仍然有效；若失败也加，那次翻页的结果被丢掉，
+    /// 「更多」会永远停在「正在读取」。
     private var generation = 0
+    /// 每次发起从头加载加一，只用来丢掉先发后到的那次从头加载。
+    private var loadSeq = 0
 
     init(orderId: Int64? = nil) {
         self.orderId = orderId
@@ -42,22 +46,23 @@ final class NotificationHistoryViewModel: ObservableObject {
 
     /// 首页。首次进入与下拉刷新都走这里。
     func load(service: any NotificationHistoryServing) async {
-        generation += 1
-        let mine = generation
+        loadSeq += 1
+        let mine = loadSeq
         do {
             let page = try await service.history(orderId: orderId, page: 0, size: Self.pageSize)
-            guard mine == generation else { return }
+            guard mine == loadSeq else { return }
+            generation += 1
             phase = .loaded(Listing(
                 items: Self.dedup(page.content),
                 nextPage: page.hasMore(requestedSize: Self.pageSize) ? 1 : nil,
                 moreState: .idle
             ))
         } catch let error as APIError {
-            if !error.endsSession, mine == generation { markFailedUnlessAlreadyShowing() }
+            if !error.endsSession, mine == loadSeq { markFailedUnlessAlreadyShowing() }
         } catch is CancellationError {
             return
         } catch {
-            if mine == generation { markFailedUnlessAlreadyShowing() }
+            if mine == loadSeq { markFailedUnlessAlreadyShowing() }
         }
     }
 

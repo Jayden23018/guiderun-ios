@@ -287,6 +287,30 @@ final class NotificationHistoryTests: XCTestCase {
         XCTAssertEqual(service.calls.map(\.page), [0, 1, 1])
     }
 
+    /// 翻页在飞时刷新失败：列表没换，翻页结果照常接上，「更多」不会卡在「正在读取」。
+    func testLoadMoreStillAppliesWhenRefreshFailsMeanwhile() async {
+        let service = FakeNotificationHistoryService([
+            .success(page([2, 1], last: false)),
+            .success(page([0], last: true)),
+            .failure(APIError.unknown(statusCode: 500))
+        ])
+        let viewModel = NotificationHistoryViewModel()
+        await viewModel.load(service: service)
+
+        let release = AsyncGate()
+        service.gate = { await release.wait() }
+        let pending = Task { await viewModel.loadMore(service: service) }
+        while service.calls.count < 2 { await Task.yield() }
+        service.gate = nil
+        await viewModel.load(service: service)   // 刷新失败，列表保留
+        await release.open()
+        _ = await pending.value
+
+        guard case .loaded(let listing) = viewModel.phase else { return XCTFail() }
+        XCTAssertEqual(listing.items.map(\.id), [2, 1, 0])
+        XCTAssertEqual(listing.moreState, .idle)
+    }
+
     /// 翻页请求在飞时用户下拉刷新：旧的第 2 页回来不许接到新的第 1 页后面。
     func testStaleLoadMoreResultIsDroppedAfterRefresh() async {
         let fresh = page([9, 8], last: true)
