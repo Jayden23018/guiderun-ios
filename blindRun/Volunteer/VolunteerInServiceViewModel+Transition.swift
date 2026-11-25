@@ -44,40 +44,57 @@ extension VolunteerInServiceViewModel {
                 target: target,
                 appState: appState
             )
+        } catch let pending as VolunteerFinishAwaitingBlind {
+            if discardsResultOfLostOrder() { return }
+            await recordFinishAwaitingBlind(pending, orderID: orderID)
         } catch VolunteerOrderActionError.timedOut {
             if discardsResultOfLostOrder() { return }
             markTransitionOutcomeUnknown(target: target, orderID: orderID, appState: appState)
         } catch let error as APIError {
-            if error.endsSession {
-                transitionState = .failed(message: error.localizedMessage)
-                return
-            }
-            if discardsResultOfLostOrder() { return }
-            switch error {
-            case .networkError, .decodingError:
-                markTransitionOutcomeUnknown(target: target, orderID: orderID, appState: appState)
-            case .serverError(let response) where response.errorCode == .invalidOrderStatus
-                && statusConflictMessage != nil:
-                // 走到这里说明订单已经不在本次动作的前置状态上了。**同时刷新一次订单**：
-                // 只播一句「已经转走了」而屏幕还停在旧状态，等于让志愿者对着一个已经不成立的界面。
-                // 先刷新再报：刷新把状态推进时 `apply` 会清错误，反过来写会把这句吞掉。
-                let message = statusConflictMessage ?? error.localizedMessage
-                transitionState = .failed(message: message)
-                await load(orderId: orderID, speakChanges: false)
-                errorMessage = message
-                speechService?.speakError(message)
-            case .serverError, .rateLimited, .unknown, .invalidURL, .missingCredentials:
-                transitionState = .failed(message: error.localizedMessage)
-                errorMessage = error.localizedMessage
-                // 只有 `start-service` 会答这个码。按钮不置灰，换的是按钮上方那行小字。
-                if error.errorCode == .blindConfirmationPending { awaitingBlindConfirmation = true }
-                speechService?.speakError(error.localizedMessage)
-            case .unauthorized:
-                transitionState = .failed(message: error.localizedMessage)
-            }
+            await handleTransitionError(
+                error, target: target, orderID: orderID, appState: appState,
+                statusConflictMessage: statusConflictMessage
+            )
         } catch {
             if discardsResultOfLostOrder() { return }
             markTransitionOutcomeUnknown(target: target, orderID: orderID, appState: appState)
+        }
+    }
+
+    /// `submitTransition` 的 API 错误分支，原样搬出（#1016 给它加了一个 catch，函数超了 SwiftLint 的长度与复杂度上限）。
+    private func handleTransitionError(
+        _ error: APIError,
+        target: RunOrderStatus,
+        orderID: Int64,
+        appState: AppState,
+        statusConflictMessage: String?
+    ) async {
+        if error.endsSession {
+            transitionState = .failed(message: error.localizedMessage)
+            return
+        }
+        if discardsResultOfLostOrder() { return }
+        switch error {
+        case .networkError, .decodingError:
+            markTransitionOutcomeUnknown(target: target, orderID: orderID, appState: appState)
+        case .serverError(let response) where response.errorCode == .invalidOrderStatus
+            && statusConflictMessage != nil:
+            // 走到这里说明订单已经不在本次动作的前置状态上了。**同时刷新一次订单**：
+            // 只播一句「已经转走了」而屏幕还停在旧状态，等于让志愿者对着一个已经不成立的界面。
+            // 先刷新再报：刷新把状态推进时 `apply` 会清错误，反过来写会把这句吞掉。
+            let message = statusConflictMessage ?? error.localizedMessage
+            transitionState = .failed(message: message)
+            await load(orderId: orderID, speakChanges: false)
+            errorMessage = message
+            speechService?.speakError(message)
+        case .serverError, .rateLimited, .unknown, .invalidURL, .missingCredentials:
+            transitionState = .failed(message: error.localizedMessage)
+            errorMessage = error.localizedMessage
+            // 只有 `start-service` 会答这个码。按钮不置灰，换的是按钮上方那行小字。
+            if error.errorCode == .blindConfirmationPending { awaitingBlindConfirmation = true }
+            speechService?.speakError(error.localizedMessage)
+        case .unauthorized:
+            transitionState = .failed(message: error.localizedMessage)
         }
     }
 

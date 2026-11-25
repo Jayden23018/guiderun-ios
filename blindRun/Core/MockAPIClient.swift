@@ -62,6 +62,11 @@ final class MockAPIClient: APIClientProtocol, @unchecked Sendable {
     var keepWaitingCounts: [Int64: Int] = [:]
     static let mockKeepWaitingLimit = 2
 
+    /// 镜像后端确认闸 `app.order.finish-blind-confirm-timeout-minutes`（#902），单位秒。0 = 关（默认，与线上一致）。
+    var finishBlindConfirmTimeout: TimeInterval = MockAPIClient.initialFinishBlindConfirmTimeout()
+    /// 每单仍有效的结束请求时刻，见 `MockAPIClient+FinishSafety.swift`。
+    var finishRequestTimes: [Int64: Date] = [:]
+
     /// 已提交的评价，`GET /api/orders/{id}/reviews` 的回放源。没有键就是「尚未评价」，
     /// 对应后端的 200 + `data: null`。
     var orderReviews: [Int64: OrderReview] = [:]

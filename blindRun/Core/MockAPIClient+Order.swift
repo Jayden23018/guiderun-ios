@@ -121,6 +121,7 @@ extension MockAPIClient {
     }
 
     func handleGetOrder(orderId: Int64) throws -> OrderDetailResponse {
+        expireFinishRequestIfNeeded(orderId: orderId)
         guard let order = orders.first(where: { $0.orderId == orderId }) else {
             throw APIError.serverError(ErrorResponse(code: "ORDER_NOT_FOUND", message: "订单不存在"))
         }

@@ -130,6 +130,8 @@ struct VolunteerRunningPage<Footer: View>: View {
     var isRinging = false
     var isRingEnabled = true
     var onRing: () -> Void = {}
+    /// 已请跑者确认安全、在等（#902）。`nil` = 没在等，页面与改动前一样。
+    var finishSafety: VolunteerFinishSafetyNotice?
     /// 求助结果、响铃结果、流转失败文案。**这一页唯一的可见失败面**。
     @ViewBuilder let footer: () -> Footer
 
@@ -169,6 +171,11 @@ struct VolunteerRunningPage<Footer: View>: View {
             // 整张卡一个读屏元素，沿用 v7 统计块的 identifier 与念法（UI 用例拿它判「进了跑步中页」）。
             BlindRunHeroCard(stats: stats, isFinished: false, spokenLabel: heroSpoken(hero))
                 .accessibilityIdentifier("volunteerRunningStatsCard")
+            // 排在其余提示前面：这时陪跑员最想知道的是「对方确认了没有、我什么时候能结束」。
+            if let finishSafety {
+                FlowNoticeBar(text: finishSafety.text)
+                    .accessibilityIdentifier("volunteerFinishSafetyNotice")
+            }
             // 同一时刻只有一条（`VolunteerRunningNotice`），放在彩色卡正下方。
             switch notice {
             case .hero:

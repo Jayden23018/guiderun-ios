@@ -180,7 +180,7 @@ final class TransitionConfirmationFixture: @unchecked Sendable {
         service.enRouteResult = transitionResult
         service.arrivedResult = transitionResult
         service.startServiceResult = transitionResult
-        service.finishResult = transitionResult
+        service.finishResult = transitionResult.map { FinishOrderResponse(completed: true) }
         service.cancelResult = transitionResult.map { CancelOrderResponse(success: true, countedAsLateCancel: false) }
         service.respondResult = transitionResult
 

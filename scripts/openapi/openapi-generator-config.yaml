@@ -64,6 +64,7 @@ filter:
     - /api/orders/{id}/en-route
     - /api/orders/{id}/end-waiting
     - /api/orders/{id}/finish
+    - /api/orders/{id}/confirm-safe
     # 接单前通话磨合（后端迁移 0031）。四条一起进，缺一条它的 schema 就不会被生成，
     # 而漂移探测器只有拿到完整定义才判得出后端往 `IntroCallView` 加了什么。
     - /api/orders/{id}/intro-call

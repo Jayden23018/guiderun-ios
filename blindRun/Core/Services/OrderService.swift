@@ -65,7 +65,11 @@ protocol OrderServing: Sendable {
     func enRoute(orderId: Int64) async throws
     func arrived(orderId: Int64) async throws
     func startService(orderId: Int64) async throws
-    func finish(orderId: Int64) async throws
+    /// 闸开着时第一次调用只记请求（`completed=false`），见 `FinishOrderResponse`。盲人端结束与 Mock 代打不读响应。
+    @discardableResult
+    func finish(orderId: Int64) async throws -> FinishOrderResponse
+    /// 跑者确认已在安全的地方（后端 #902）。成功即订单完成。
+    func confirmSafe(orderId: Int64) async throws
 
     /// 跨天预约单的临期确认。与 `enRoute` **不是一回事**，理由见 `OrderEndpoint.confirmDeparture`。
     func confirmDeparture(orderId: Int64) async throws
@@ -195,8 +199,13 @@ struct OrderService: OrderServing {
         let _: EmptyResponse = try await transport.send(OrderEndpoint.startService(orderId: orderId).request)
     }
 
-    func finish(orderId: Int64) async throws {
-        let _: EmptyResponse = try await transport.send(OrderEndpoint.finish(orderId: orderId).request)
+    @discardableResult
+    func finish(orderId: Int64) async throws -> FinishOrderResponse {
+        try await transport.send(OrderEndpoint.finish(orderId: orderId).request)
+    }
+
+    func confirmSafe(orderId: Int64) async throws {
+        let _: EmptyResponse = try await transport.send(OrderEndpoint.confirmSafe(orderId: orderId).request)
     }
 
     func confirmDeparture(orderId: Int64) async throws {

@@ -177,6 +177,7 @@ extension BlindOrderStatusViewModel {
         backgroundedSinceLastApply = false
         order = updated
         announceArrivalCancelUnlockIfNeeded(for: updated, speakChanges: speakChanges)
+        announceFinishRequestOnFirstLoad(previousStatus: previousStatus, updated: updated, speakChanges: speakChanges)
         appState?.liveEscortCoordinator.updateOwnedOrder(orderID: updated.orderId, status: updated.status)
         // 锁屏卡顶行那句「陪跑中 · 张」。姓氏只有这一端拿得到，所以**排在
         // `updateOwnedOrder` 之后** —— 换单时它内部会 `clearRuntimeSession()`，

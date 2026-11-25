@@ -259,9 +259,7 @@ extension MockAPIClient {
             if path.hasSuffix("/start-service") && method == .post {
                 return try handleStartService(orderId: orderId)
             }
-            if path.hasSuffix("/finish") && method == .post {
-                return try handleFinish(orderId: orderId)
-            }
+            if let response = try handleFinishSafetyRoute(method: method, path: path, orderId: orderId) { return response }
             if path.hasSuffix("/cancel") && method == .post {
                 return try handleCancel(orderId: orderId)
             }

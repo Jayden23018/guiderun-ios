@@ -351,7 +351,7 @@ public protocol APIProtocol: Sendable {
     ///    两侧各外扩 `app.order.booking-buffer-minutes`（默认 60）判区间相交。
     ///    🚩 **2026-09-05 起从「有任何未走完的单就拒绝」改成只拦时段冲突** —— 跨天预约上线后，
     ///    约了后天早上的单不该让人这两天里下不了任何单，而取消预约就抢不回那个志愿者了。
-    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 3）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
+    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 8）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
     ///    这是第 7 条放开之后唯一的刷单闸门。
     ///    **取消次数闸（#826 M9）**：滚动 `app.order.cancel-limit-window-hours`（默认 24）小时内，**已开始派单**就被盲人自己取消的单满
     ///    `app.order.cancel-limit-count`（默认 5）张时拒绝，409 `ORDER_CANCEL_LIMIT_REACHED`，`message` 里带最早恢复下单的时刻。
@@ -524,6 +524,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/orders/{id}/confirm-departure`.
     /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-departure/post(confirmDeparture)`.
     func confirmDeparture(_ input: Operations.confirmDeparture.Input) async throws -> Operations.confirmDeparture.Output
+    /// 盲人确认已在安全地点，结束陪跑
+    ///
+    /// 角色：`BLIND`（本单下单人）。陪跑员调 `POST /api/orders/{id}/finish` 之后（订单详情 `finishRequestedAt` 非空），
+    /// 盲人收到 `FINISH_SAFETY_CONFIRM_REQUESTED`（HIGH），确认自己已在安全地点后调本端点，订单进入 `COMPLETED`。
+    /// 结束前确认跑者在安全地点是负责人 2026-11-22 定的规则（#902）。盲人还不安全时**不要**调用：订单保持 `IN_PROGRESS`，
+    /// 位置互推、走散检测和号码都照常；陪跑员要等 `unilateralFinishOpensAt` 之后才能单方面结束。
+    ///
+    /// 与陪跑员结束走同一条完成逻辑（完成次数、积分、服务时长照常）。这一单还有未结束的紧急求助时返回 409 `ORDER_HAS_ACTIVE_EMERGENCY`。
+    ///
+    /// 幂等：已由本人确认完成的单重复调用返回 200。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/confirm-safe`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)`.
+    func confirmSafe(_ input: Operations.confirmSafe.Input) async throws -> Operations.confirmSafe.Output
     /// 陪跑员已动身（真的出门了，开始双向推位置）
     ///
     /// ⚠️ **与 `/confirm-departure` 不是一回事，别弄混**：那一步只回答「你还去吗」，人可能还在家里；
@@ -561,6 +575,19 @@ public protocol APIProtocol: Sendable {
     /// - Remark: Generated from `#/paths//api/orders/{id}/end-waiting/post(endWaiting)`.
     func endWaiting(_ input: Operations.endWaiting.Input) async throws -> Operations.endWaiting.Output
     /// 角色：`VOLUNTEER`（本单接单人）或 `BLIND`（本单下单人，#346）。仅接受 `IN_PROGRESS` （比状态迁移表更严：表里 `DRIVER_EN_ROUTE`/`DRIVER_ARRIVED` → `COMPLETED` 也是合法边， 但那条只给超时自动完成用）。
+    ///
+    /// 🆕 **陪跑员结束分两步（#902，负责人 2026-11-22 定「结束前确认跑者在安全地点」）**：
+    /// 确认闸由 `app.order.finish-blind-confirm-timeout-minutes` 控制（负责人定 10 分钟；默认 0 = 关闭，此时陪跑员调用即完成，`completed=true`，
+    /// 支持两步结束的 iOS 上架后生产才打开）。闸开着时：
+    /// 第一次调用**不完成订单**，只记下请求（订单详情 `finishRequestedAt`）并推盲人 `FINISH_SAFETY_CONFIRM_REQUESTED`，
+    /// 响应 `completed=false`、`unilateralFinishOpensAt` = 请求时刻 + 上面那个分钟数。
+    /// 盲人调 `POST /api/orders/{id}/confirm-safe` 后订单完成。盲人一直没确认时，陪跑员在 `unilateralFinishOpensAt` 之后再调一次本端点，
+    /// 订单单方面完成（`completed=true`）；早于这个时刻返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，message 可直接朗读，
+    /// 同时给盲人重推一次确认请求（距上次推送满 1 分钟才推）。
+    /// **结束请求自动失效**（负责人 2026-11-22 定）：请求只在「请求时刻 + 2 × 确认超时」（10 分钟时为 20 分钟）之前有效。
+    /// 过了这个时刻，陪跑员再调本端点等于重新请求：请求时刻换成现在、再推一次 `FINISH_SAFETY_CONFIRM_REQUESTED`、返回 `completed=false`，
+    /// 不会直接完成（盲人说过「还没到，继续陪」之后，隔很久再点仍要再问他一次）。
+    /// 不按位置判断。预定结束时间 + 60 分钟的自动完成不变。响应 `completed=true` 才表示订单已经结束。
     ///
     /// **盲人结束**只在陪跑员掉线时放行：陪跑员已超过 `app.order.blind-finish-volunteer-offline-minutes` （默认 5 分钟）没有上报位置。判据由后端算，客户端不用自己判，按下去看返回即可： 陪跑员还在线时返回 409 `VOLUNTEER_STILL_ONLINE`，message 里带最早可以结束的时刻（可直接朗读）。 盲人结束的单对陪跑员照常算完成、积分和服务时长，与陪跑员结束走同一条逻辑， 只在订单状态日志里记下是盲人结束的。
     ///
@@ -824,15 +851,15 @@ public protocol APIProtocol: Sendable {
     ///   存量志愿者已由 `migrations/0007_backfill_volunteer_verified.sql` 一次性放行（无感知），
     ///   仅新注册志愿者需先走 `POST /api/volunteer/verification` 上传证书并等待管理员审核。
     /// - 403 `VOLUNTEER_NOT_AVAILABLE` — 志愿者关闭了接单开关（`wantsDispatch=false`）
-    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你
+    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你 / 邀请已失效。
+    ///   也包括「要先通话、距开跑已不够聊一轮」（#970）：`ACCEPT` 和 `INTERESTED` 都回这个，
+    ///   message 是「距开跑已不够先通一次电话，这一单不能再接了」，熟人也一样。
+    ///   例外：开跑之后才重新匹配的单不先通话，替补直接 `ACCEPT`（`requiresIntroCall=false`）
     /// - 409 `ORDER_ALREADY_ACCEPTED` — 已被他人接单 / 状态不允许接单
     /// - 409 `ORDER_CONCURRENT_CONFLICT` — 乐观锁并发冲突，可稍后重试
-    /// - 409 `INTRO_CALL_REQUIRED` — 没聊过的一对发了 `ACCEPT`，改发 `INTERESTED`
-    /// - 409 `INTRO_CALL_NOT_REQUIRED` — 已聊成过的一对发了 `INTERESTED`，改发 `ACCEPT`。
-    ///   正常流程走不到（`requiresIntroCall` 对熟人恒为 false），撞上通常是界面状态过期 /
-    ///   弱网重试 / 旧版客户端。⚠️ 后端**刻意不「顺手当 ACCEPT 处理」**：`INTERESTED` 不构成接单、
-    ///   聊崩了对志愿者没有统计损失，`ACCEPT` 当场把他绑在这一单上，静默转换等于替他做了承诺。
-    ///   客户端收到后按 `requiresIntroCall=false` 重发 `ACCEPT` 即可
+    /// - 409 `INTRO_CALL_REQUIRED` — 要求先通话的单发了 `ACCEPT`，改发 `INTERESTED`。
+    ///   #970 起磨合成功过的一对（含固定搭档）也会收到
+    /// - `INTRO_CALL_NOT_REQUIRED` — #970 起不再下发（熟人不再免通话）。旧版说明：已聊成过的一对发了 `INTERESTED`
     /// - 409 `INTRO_CALL_PAIR_BUSY` — 你和这位跑者正在为**另一张单**通话磨合，又对这一张发了 `INTERESTED`。
     ///   一对人同一时刻只能为一张单通话。提示先把那一单聊完：聊成了这一单直接 `ACCEPT`
     ///
@@ -1948,7 +1975,7 @@ extension APIProtocol {
     ///    两侧各外扩 `app.order.booking-buffer-minutes`（默认 60）判区间相交。
     ///    🚩 **2026-09-05 起从「有任何未走完的单就拒绝」改成只拦时段冲突** —— 跨天预约上线后，
     ///    约了后天早上的单不该让人这两天里下不了任何单，而取消预约就抢不回那个志愿者了。
-    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 3）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
+    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 8）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
     ///    这是第 7 条放开之后唯一的刷单闸门。
     ///    **取消次数闸（#826 M9）**：滚动 `app.order.cancel-limit-window-hours`（默认 24）小时内，**已开始派单**就被盲人自己取消的单满
     ///    `app.order.cancel-limit-count`（默认 5）张时拒绝，409 `ORDER_CANCEL_LIMIT_REACHED`，`message` 里带最早恢复下单的时刻。
@@ -2205,6 +2232,28 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// 盲人确认已在安全地点，结束陪跑
+    ///
+    /// 角色：`BLIND`（本单下单人）。陪跑员调 `POST /api/orders/{id}/finish` 之后（订单详情 `finishRequestedAt` 非空），
+    /// 盲人收到 `FINISH_SAFETY_CONFIRM_REQUESTED`（HIGH），确认自己已在安全地点后调本端点，订单进入 `COMPLETED`。
+    /// 结束前确认跑者在安全地点是负责人 2026-11-22 定的规则（#902）。盲人还不安全时**不要**调用：订单保持 `IN_PROGRESS`，
+    /// 位置互推、走散检测和号码都照常；陪跑员要等 `unilateralFinishOpensAt` 之后才能单方面结束。
+    ///
+    /// 与陪跑员结束走同一条完成逻辑（完成次数、积分、服务时长照常）。这一单还有未结束的紧急求助时返回 409 `ORDER_HAS_ACTIVE_EMERGENCY`。
+    ///
+    /// 幂等：已由本人确认完成的单重复调用返回 200。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/confirm-safe`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)`.
+    public func confirmSafe(
+        path: Operations.confirmSafe.Input.Path,
+        headers: Operations.confirmSafe.Input.Headers = .init()
+    ) async throws -> Operations.confirmSafe.Output {
+        try await confirmSafe(Operations.confirmSafe.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// 陪跑员已动身（真的出门了，开始双向推位置）
     ///
     /// ⚠️ **与 `/confirm-departure` 不是一回事，别弄混**：那一步只回答「你还去吗」，人可能还在家里；
@@ -2258,6 +2307,19 @@ extension APIProtocol {
         ))
     }
     /// 角色：`VOLUNTEER`（本单接单人）或 `BLIND`（本单下单人，#346）。仅接受 `IN_PROGRESS` （比状态迁移表更严：表里 `DRIVER_EN_ROUTE`/`DRIVER_ARRIVED` → `COMPLETED` 也是合法边， 但那条只给超时自动完成用）。
+    ///
+    /// 🆕 **陪跑员结束分两步（#902，负责人 2026-11-22 定「结束前确认跑者在安全地点」）**：
+    /// 确认闸由 `app.order.finish-blind-confirm-timeout-minutes` 控制（负责人定 10 分钟；默认 0 = 关闭，此时陪跑员调用即完成，`completed=true`，
+    /// 支持两步结束的 iOS 上架后生产才打开）。闸开着时：
+    /// 第一次调用**不完成订单**，只记下请求（订单详情 `finishRequestedAt`）并推盲人 `FINISH_SAFETY_CONFIRM_REQUESTED`，
+    /// 响应 `completed=false`、`unilateralFinishOpensAt` = 请求时刻 + 上面那个分钟数。
+    /// 盲人调 `POST /api/orders/{id}/confirm-safe` 后订单完成。盲人一直没确认时，陪跑员在 `unilateralFinishOpensAt` 之后再调一次本端点，
+    /// 订单单方面完成（`completed=true`）；早于这个时刻返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，message 可直接朗读，
+    /// 同时给盲人重推一次确认请求（距上次推送满 1 分钟才推）。
+    /// **结束请求自动失效**（负责人 2026-11-22 定）：请求只在「请求时刻 + 2 × 确认超时」（10 分钟时为 20 分钟）之前有效。
+    /// 过了这个时刻，陪跑员再调本端点等于重新请求：请求时刻换成现在、再推一次 `FINISH_SAFETY_CONFIRM_REQUESTED`、返回 `completed=false`，
+    /// 不会直接完成（盲人说过「还没到，继续陪」之后，隔很久再点仍要再问他一次）。
+    /// 不按位置判断。预定结束时间 + 60 分钟的自动完成不变。响应 `completed=true` 才表示订单已经结束。
     ///
     /// **盲人结束**只在陪跑员掉线时放行：陪跑员已超过 `app.order.blind-finish-volunteer-offline-minutes` （默认 5 分钟）没有上报位置。判据由后端算，客户端不用自己判，按下去看返回即可： 陪跑员还在线时返回 409 `VOLUNTEER_STILL_ONLINE`，message 里带最早可以结束的时刻（可直接朗读）。 盲人结束的单对陪跑员照常算完成、积分和服务时长，与陪跑员结束走同一条逻辑， 只在订单状态日志里记下是盲人结束的。
     ///
@@ -2615,15 +2677,15 @@ extension APIProtocol {
     ///   存量志愿者已由 `migrations/0007_backfill_volunteer_verified.sql` 一次性放行（无感知），
     ///   仅新注册志愿者需先走 `POST /api/volunteer/verification` 上传证书并等待管理员审核。
     /// - 403 `VOLUNTEER_NOT_AVAILABLE` — 志愿者关闭了接单开关（`wantsDispatch=false`）
-    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你
+    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你 / 邀请已失效。
+    ///   也包括「要先通话、距开跑已不够聊一轮」（#970）：`ACCEPT` 和 `INTERESTED` 都回这个，
+    ///   message 是「距开跑已不够先通一次电话，这一单不能再接了」，熟人也一样。
+    ///   例外：开跑之后才重新匹配的单不先通话，替补直接 `ACCEPT`（`requiresIntroCall=false`）
     /// - 409 `ORDER_ALREADY_ACCEPTED` — 已被他人接单 / 状态不允许接单
     /// - 409 `ORDER_CONCURRENT_CONFLICT` — 乐观锁并发冲突，可稍后重试
-    /// - 409 `INTRO_CALL_REQUIRED` — 没聊过的一对发了 `ACCEPT`，改发 `INTERESTED`
-    /// - 409 `INTRO_CALL_NOT_REQUIRED` — 已聊成过的一对发了 `INTERESTED`，改发 `ACCEPT`。
-    ///   正常流程走不到（`requiresIntroCall` 对熟人恒为 false），撞上通常是界面状态过期 /
-    ///   弱网重试 / 旧版客户端。⚠️ 后端**刻意不「顺手当 ACCEPT 处理」**：`INTERESTED` 不构成接单、
-    ///   聊崩了对志愿者没有统计损失，`ACCEPT` 当场把他绑在这一单上，静默转换等于替他做了承诺。
-    ///   客户端收到后按 `requiresIntroCall=false` 重发 `ACCEPT` 即可
+    /// - 409 `INTRO_CALL_REQUIRED` — 要求先通话的单发了 `ACCEPT`，改发 `INTERESTED`。
+    ///   #970 起磨合成功过的一对（含固定搭档）也会收到
+    /// - `INTRO_CALL_NOT_REQUIRED` — #970 起不再下发（熟人不再免通话）。旧版说明：已聊成过的一对发了 `INTERESTED`
     /// - 409 `INTRO_CALL_PAIR_BUSY` — 你和这位跑者正在为**另一张单**通话磨合，又对这一张发了 `INTERESTED`。
     ///   一对人同一时刻只能为一张单通话。提示先把那一单聊完：聊成了这一单直接 `ACCEPT`
     ///
@@ -5369,12 +5431,13 @@ public enum Components {
             ///   `INTRO_CALL_REQUIRED`，而志愿者看到的是「点了接单没反应」
             /// - `false` → 发 `ACCEPT`（直接接单）
             ///
-            /// 没有这个字段客户端只能盲猜 —— 判断依据（这两人磨合成功过没有、距开跑还够不够
-            /// 塞下一轮通话窗口）全在后端，客户端一个都拿不到。
+            /// 判断依据在后端，客户端不要自己算。
             ///
-            /// `false` 的三种成因（**客户端不需要区分**）：通话功能整体关闭、
-            /// 这两人已经磨合成功过、距开跑时间已不够聊一轮（退化成直接接单）。
-            /// 时段待定的单（`timeFlexible=true`）恒为 `true`，熟人搭档也一样。
+            /// #970（2026-11-23）起：**磨合成功过的一对（含固定搭档）也是 `true`**，熟人不再免通话。
+            /// `false` 只在两种情况出现：通话功能整体关闭（后端止血开关）；开跑之后才重新匹配的单（替补直接接）。
+            /// 其余距开跑已不够聊一轮的单**不能接**：它不出现在本列表里，点「接单」或「有意向」都回 409
+            /// `ORDER_DISPATCH_MISMATCH`，系统随后按无人接单结束这一单。
+            /// 时段待定的单（`timeFlexible=true`）恒为 `true`。
             ///
             /// - Remark: Generated from `#/components/schemas/AvailableOrderResponse/requiresIntroCall`.
             public var requiresIntroCall: Swift.Bool?
@@ -7546,7 +7609,7 @@ public enum Components {
                 case success
             }
         }
-        /// 陪跑员出发中的预计到达（陪跑员端订单页 v2）。剩余距离 = 陪跑员当前位置到出发点直线 × 1.4； 速度 = 上报的瞬时速度夹在 15 km/h 的 0.5–1.5 倍之间，没有则按 15 km/h。
+        /// 陪跑员出发中的预计到达（陪跑员端订单页 v2；2026-11-23 起本单盲人也下发，#943）。剩余距离 = 陪跑员当前位置到出发点直线 × 1.4； 速度 = 上报的瞬时速度夹在 15 km/h 的 0.5–1.5 倍之间，没有则按 15 km/h。
         ///
         /// - Remark: Generated from `#/components/schemas/EtaView`.
         public struct EtaView: Codable, Hashable, Sendable {
@@ -9192,6 +9255,10 @@ public enum Components {
             public var eta: Components.Schemas.EtaView?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/expectedDurationMinutes`.
             public var expectedDurationMinutes: Swift.Int32?
+            /// （2026-11-22 新增，#902）陪跑员请求结束的时刻。非空 = 陪跑员已点结束、在等盲人确认已在安全地点：盲人端应显示「我已在安全的地方，结束陪跑」（`POST /api/orders/{id}/confirm-safe`）。只在 `IN_PROGRESS`、请求仍有效（请求时刻 + 2 × 确认超时之内，过了自动作废）且查看者是本单盲人或陪跑员时下发，其余为 null。
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/finishRequestedAt`.
+            public var finishRequestedAt: Swift.String?
             /// （2026-09-26 新增，陪跑员端订单页 v2）跑者用自己的话写给陪跑员的引导偏好（≤80 字），取自盲人资料，未填为 `null`。 详情只对本单参与者开放，所以陪跑员接单后才看得到
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/guidePreferenceText`.
@@ -9295,6 +9362,10 @@ public enum Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/primaryActionUnlockAt`.
             public var primaryActionUnlockAt: Swift.String?
+            /// （2026-11-23 新增，#905）**当前这次**重新匹配是不是陪跑员在**出发之后**退出的。`true` = 陪跑员是在 `DRIVER_EN_ROUTE` / `DRIVER_ARRIVED` / `IN_PROGRESS` 退出（含取消、失联判定），盲人身边可能已经没有人，应先提示停下、走到安全的地方；`false` = 出发前退出（`PENDING_ACCEPT` / `SCHEDULED_CONFIRMED`），没有这层风险。只在订单处于 `REMATCHING` 且查看者是下单的盲人时有值，**其余一律为 null**（非 `REMATCHING` 态、陪跑员视角）。换到新陪跑员后订单离开 `REMATCHING`，字段随之变回 null；新陪跑员又退出时按那一次重新算。判据与 `REMATCHING_MID_RUN` 推送同一份，可以替换 iOS 本机记录（`BlindMidRunDeparture`）。
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/rematchedMidRun`.
+            public var rematchedMidRun: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/routeNotes`.
             public var routeNotes: Swift.String?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/routePreference`.
@@ -9433,6 +9504,10 @@ public enum Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/shareExpiresAt`.
             public var shareExpiresAt: Swift.String?
+            /// （2026-11-22 新增，#902）陪跑结束后求助按钮保留到这一刻（订单结束后 `app.order.post-finish-sos-window-minutes`，默认 30 分钟）。这段时间里带本单 `orderId` 发起的求助会挂在这张订单上，客服能看到是哪一单；不通知陪跑员。只在 `COMPLETED`、还没过这一刻、且查看者是下单的盲人时下发，其余为 null。iOS 在 `IN_PROGRESS` 和这一刻之前都显示求助按钮。过了这一刻后端仍受理盲人的求助，按不挂订单的独立求助处理。
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/sosWindowEndsAt`.
+            public var sosWindowEndsAt: Swift.String?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/specialNotes`.
             public var specialNotes: Swift.String?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/startAddress`.
@@ -9504,7 +9579,7 @@ public enum Components {
             }
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/status`.
             public var status: Components.Schemas.OrderDetailResponse.statusPayload
-            /// 建议出发时刻 = `plannedStart` − `travelMinutes` − 5 分钟缓冲。下发条件同 `travelMinutes`
+            /// 建议出发时刻 = `plannedStart` − `travelMinutes` − 5 分钟缓冲。 状态与位置条件同 `travelMinutes`，但下发给**本单陪跑员和本单盲人**两方（盲人侧 2026-11-23 起，#943；盲人拿到时 `travelMinutes` 等其余三个仍为 `null`），其他人一律 `null`。 是直线估算，盲人端展示时措辞带「约」。
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/suggestedDepartAt`.
             public var suggestedDepartAt: Swift.String?
@@ -9568,10 +9643,14 @@ public enum Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/timeFlexible`.
             public var timeFlexible: Swift.Bool
-            /// （2026-09-25 新增，陪跑员端订单页 v2）陪跑员到出发点的估算路上时间（分钟）= 陪跑员**最后已知位置**到 `startLatitude/startLongitude` 的直线距离 × 1.4 ÷ 15 km/h（统一按骑车），向上取整、封顶 120。 🚩 本字段与 `suggestedDepartAt` / `departReminderAt` / `primaryActionUnlockAt` **同进同出**： 只对本单陪跑员、只在 `SCHEDULED_CONFIRMED` / `PENDING_ACCEPT`、且陪跑员有过位置记录时下发，其余一律 `null`。
+            /// （2026-09-25 新增，陪跑员端订单页 v2）陪跑员到出发点的估算路上时间（分钟）= 陪跑员**最后已知位置**到 `startLatitude/startLongitude` 的直线距离 × 1.4 ÷ 15 km/h（统一按骑车），向上取整、封顶 120。 🚩 本字段与 `departReminderAt` / `primaryActionUnlockAt` **同进同出**： 只对本单陪跑员、只在 `SCHEDULED_CONFIRMED` / `PENDING_ACCEPT`、且陪跑员有过位置记录时下发，其余一律 `null`。 `suggestedDepartAt` 条件相同，但本单盲人也拿得到（见该字段）。
             ///
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/travelMinutes`.
             public var travelMinutes: Swift.Int32?
+            /// （2026-11-22 新增，#902）陪跑员最早可以单方面结束的时刻 = `finishRequestedAt` + `app.order.finish-blind-confirm-timeout-minutes`（负责人定 10 分钟；配置为 0 时确认闸关闭，本字段恒为 null）。到点前陪跑员再调 `POST /api/orders/{id}/finish` 返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，到点后调用即完成订单。只对本单陪跑员、且订单在 `IN_PROGRESS` 并有仍有效的结束请求时下发，其余为 null（请求作废后为 null，陪跑员再点结束会重新请求）。客户端不要自己拿请求时刻加分钟数。
+            ///
+            /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/unilateralFinishOpensAt`.
+            public var unilateralFinishOpensAt: Swift.String?
             /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/visionLevel`.
             public struct visionLevelPayload: Codable, Hashable, Sendable {
                 /// - Remark: Generated from `#/components/schemas/OrderDetailResponse/visionLevel/value1`.
@@ -9763,6 +9842,7 @@ public enum Components {
             ///   - endLongitude: 终点经度
             ///   - eta:
             ///   - expectedDurationMinutes:
+            ///   - finishRequestedAt: （2026-11-22 新增，#902）陪跑员请求结束的时刻。非空 = 陪跑员已点结束、在等盲人确认已在安全地点：盲人端应显示「我已在安全的地方，结束陪跑」（`POST /api/orders/{id}/confirm-safe`）。只在 `IN_PROGRESS`、请求仍有效（请求时刻 + 2 × 确认超时之内，过了自动作废）且查看者是本单盲人或陪跑员时下发，其余为 null。
             ///   - guidePreferenceText: （2026-09-26 新增，陪跑员端订单页 v2）跑者用自己的话写给陪跑员的引导偏好（≤80 字），取自盲人资料，未填为 `null`。 详情只对本单参与者开放，所以陪跑员接单后才看得到
             ///   - hasGuideDogThisRun:
             ///   - matchResultLatestAt: （2026-11-12 新增，#949）**最晚这一刻会有结果**：到这一刻之前，这一单要么有陪跑员接下，要么转 `NO_VOLUNTEER` / 自动取消并推送告知。是上界不是预测，可能更早出结果。只在 `PENDING_MATCH` / `REMATCHING` 且查看者是下单的盲人时有值，其余为 null。**客户端照着念时刻，别自己写死「开跑前半小时」**：有陪跑员握着邀请时系统会自动顺延，结果可能晚于开跑前半小时，甚至晚于开跑时刻。值会随顺延和重新匹配变化，每次刷新订单详情都重新读
@@ -9778,6 +9858,7 @@ public enum Components {
             ///   - plannedStart:
             ///   - preferredStartTime: （2026-11-06 新增，#932）跑者想几点左右开始，只在 `timeFlexible=true` 时可能有值，落在时段之内。约成后为 null（准点已写进 `plannedStartTime`）
             ///   - primaryActionUnlockAt: 主按钮「我出发了」亮起的时刻 = max(`suggestedDepartAt` − 30 分钟, `plannedStart` − `app.order.en-route-earliest-minutes`)。 取 max 是因为 `POST /api/orders/{id}/en-route` 在后者之前一律 409 `DEPARTURE_TOO_EARLY`。下发条件同 `travelMinutes`
+            ///   - rematchedMidRun: （2026-11-23 新增，#905）**当前这次**重新匹配是不是陪跑员在**出发之后**退出的。`true` = 陪跑员是在 `DRIVER_EN_ROUTE` / `DRIVER_ARRIVED` / `IN_PROGRESS` 退出（含取消、失联判定），盲人身边可能已经没有人，应先提示停下、走到安全的地方；`false` = 出发前退出（`PENDING_ACCEPT` / `SCHEDULED_CONFIRMED`），没有这层风险。只在订单处于 `REMATCHING` 且查看者是下单的盲人时有值，**其余一律为 null**（非 `REMATCHING` 态、陪跑员视角）。换到新陪跑员后订单离开 `REMATCHING`，字段随之变回 null；新陪跑员又退出时按那一次重新算。判据与 `REMATCHING_MID_RUN` 推送同一份，可以替换 iOS 本机记录（`BlindMidRunDeparture`）。
             ///   - routeNotes:
             ///   - routePreference:
             ///   - run:
@@ -9785,15 +9866,17 @@ public enum Components {
             ///   - runnerTopColor: （2026-10-15 新增，#755）跑者上衣颜色（陪跑员在通话里问来、写进见面安排单）。null = 未确认 / 没有安排单。开放枚举，同上
             ///   - shareActive: 这一单当前是否有生效中的行程分享链接。 🚨 **只对下单的盲人本人下发；志愿者视角恒为 `null`**（不是 `false`）。 客户端据此渲染「停止分享」入口 —— 此前该状态只记在客户端本地， App 被杀 / 换设备 / 重装后，告知页承诺的「你可以随时停止分享」就静默失效。 为什么志愿者拿不到：本仓库的威胁模型是「陪跑中志愿者可能就是威胁来源」， 下发这个字段等于告诉一个潜在的坏人**这趟有没有人在看**，`false` 比 `true` 危险得多。
             ///   - shareExpiresAt: 生效中分享链接的到期时刻；`shareActive` 为 true 时才有值，同样只对盲人本人下发。 ⚠️ 该值在**建立令牌时一次算定**（`max(plannedEndTime, now) + app.share.ttl-after-end-hours`）， **不随订单被 keep-waiting 反复延长而重算** —— 跑得比计划久很多时链接会先到期， 盲人重新生成一个即可。客户端可据此做到期前提示，但不要假设它会自己往后延。 订单进终态后该值会被收紧：完成 → 缩短到「完成时刻 + ttl」；取消 / 无人接单 → 链接直接撤销（`shareActive` 变 false）。
+            ///   - sosWindowEndsAt: （2026-11-22 新增，#902）陪跑结束后求助按钮保留到这一刻（订单结束后 `app.order.post-finish-sos-window-minutes`，默认 30 分钟）。这段时间里带本单 `orderId` 发起的求助会挂在这张订单上，客服能看到是哪一单；不通知陪跑员。只在 `COMPLETED`、还没过这一刻、且查看者是下单的盲人时下发，其余为 null。iOS 在 `IN_PROGRESS` 和这一刻之前都显示求助按钮。过了这一刻后端仍受理盲人的求助，按不挂订单的独立求助处理。
             ///   - specialNotes:
             ///   - startAddress:
             ///   - startLatitude:
             ///   - startLongitude:
             ///   - status:
-            ///   - suggestedDepartAt: 建议出发时刻 = `plannedStart` − `travelMinutes` − 5 分钟缓冲。下发条件同 `travelMinutes`
+            ///   - suggestedDepartAt: 建议出发时刻 = `plannedStart` − `travelMinutes` − 5 分钟缓冲。 状态与位置条件同 `travelMinutes`，但下发给**本单陪跑员和本单盲人**两方（盲人侧 2026-11-23 起，#943；盲人拿到时 `travelMinutes` 等其余三个仍为 `null`），其他人一律 `null`。 是直线估算，盲人端展示时措辞带「约」。
             ///   - tetherPreference:
             ///   - timeFlexible: （2026-11-06 新增，#932）**时段待定**。`true` = `plannedStartTime` / `plannedEndTime` 是盲人选的一个时段，准点还没定（电话里定、写进见面安排单）；朗读时说「6:00 到 11:00 之间」而不是「6:00 开始」。约成那一刻变回 `false`，此后两个时间就是准点。永远有值
-            ///   - travelMinutes: （2026-09-25 新增，陪跑员端订单页 v2）陪跑员到出发点的估算路上时间（分钟）= 陪跑员**最后已知位置**到 `startLatitude/startLongitude` 的直线距离 × 1.4 ÷ 15 km/h（统一按骑车），向上取整、封顶 120。 🚩 本字段与 `suggestedDepartAt` / `departReminderAt` / `primaryActionUnlockAt` **同进同出**： 只对本单陪跑员、只在 `SCHEDULED_CONFIRMED` / `PENDING_ACCEPT`、且陪跑员有过位置记录时下发，其余一律 `null`。
+            ///   - travelMinutes: （2026-09-25 新增，陪跑员端订单页 v2）陪跑员到出发点的估算路上时间（分钟）= 陪跑员**最后已知位置**到 `startLatitude/startLongitude` 的直线距离 × 1.4 ÷ 15 km/h（统一按骑车），向上取整、封顶 120。 🚩 本字段与 `departReminderAt` / `primaryActionUnlockAt` **同进同出**： 只对本单陪跑员、只在 `SCHEDULED_CONFIRMED` / `PENDING_ACCEPT`、且陪跑员有过位置记录时下发，其余一律 `null`。 `suggestedDepartAt` 条件相同，但本单盲人也拿得到（见该字段）。
+            ///   - unilateralFinishOpensAt: （2026-11-22 新增，#902）陪跑员最早可以单方面结束的时刻 = `finishRequestedAt` + `app.order.finish-blind-confirm-timeout-minutes`（负责人定 10 分钟；配置为 0 时确认闸关闭，本字段恒为 null）。到点前陪跑员再调 `POST /api/orders/{id}/finish` 返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，到点后调用即完成订单。只对本单陪跑员、且订单在 `IN_PROGRESS` 并有仍有效的结束请求时下发，其余为 null（请求作废后为 null，陪跑员再点结束会重新请求）。客户端不要自己拿请求时刻加分钟数。
             ///   - visionLevel:
             ///   - volunteerAvgRating: 已接单志愿者的历史平均评分（1–5）。**未接单时为 null**（三个 volunteer* 统计字段 都挂在 `order.volunteer` 上，`PENDING_MATCH`/`REMATCHING`/`NO_VOLUNTEER`/`CANCELLED` 期它本就是 null ⇒「接单前不下发可识别信息」是结构上成立的，不靠调用方判状态）。 🚨 **null 与 0 语义完全不同**：null = 这位志愿者还没有收到过评价（`volunteerTotalRatings` 为 0）， 客户端要念「这位志愿者还没有评价」；念成「0 分」是把一个新人说成了差评。
             ///   - volunteerId: 已接单志愿者的用户 id。**未接单时为 null。** 🚨 **用途只有一个：拿去调 `PUT /api/blind/favorite-volunteers/{volunteerId}` 收藏这位志愿者。** 不要拿它拼任何展示文案，也不要拿它做拨号 —— 号码仍然只走 `volunteerPhone` 那条状态门。 ⚠️ 「只在接单后下发」是**结构上成立**的，不是额外判断：`PENDING_MATCH` / `PENDING_INTRO_CALL` / `REMATCHING` / `NO_VOLUNTEER` / `CANCELLED` 期 `order.volunteer` 本就是 null（通话磨合期的候选人存在 `dispatchCurrentVolunteerId` 里，**刻意不从这里漏出去** —— 接单前给出一个稳定 id 等于给每个候选人一个可长期持有的标识）。
@@ -9827,6 +9910,7 @@ public enum Components {
                 endLongitude: Swift.Double? = nil,
                 eta: Components.Schemas.EtaView? = nil,
                 expectedDurationMinutes: Swift.Int32? = nil,
+                finishRequestedAt: Swift.String? = nil,
                 guidePreferenceText: Swift.String? = nil,
                 hasGuideDogThisRun: Swift.Bool? = nil,
                 matchResultLatestAt: Swift.String? = nil,
@@ -9842,6 +9926,7 @@ public enum Components {
                 plannedStart: Swift.String,
                 preferredStartTime: Swift.String? = nil,
                 primaryActionUnlockAt: Swift.String? = nil,
+                rematchedMidRun: Swift.Bool? = nil,
                 routeNotes: Swift.String? = nil,
                 routePreference: Components.Schemas.OrderDetailResponse.routePreferencePayload? = nil,
                 run: Components.Schemas.RunView? = nil,
@@ -9849,6 +9934,7 @@ public enum Components {
                 runnerTopColor: Components.Schemas.OrderDetailResponse.runnerTopColorPayload? = nil,
                 shareActive: Swift.Bool? = nil,
                 shareExpiresAt: Swift.String? = nil,
+                sosWindowEndsAt: Swift.String? = nil,
                 specialNotes: Swift.String? = nil,
                 startAddress: Swift.String,
                 startLatitude: Swift.Double,
@@ -9858,6 +9944,7 @@ public enum Components {
                 tetherPreference: Components.Schemas.OrderDetailResponse.tetherPreferencePayload? = nil,
                 timeFlexible: Swift.Bool,
                 travelMinutes: Swift.Int32? = nil,
+                unilateralFinishOpensAt: Swift.String? = nil,
                 visionLevel: Components.Schemas.OrderDetailResponse.visionLevelPayload? = nil,
                 volunteerAvgRating: Swift.Double? = nil,
                 volunteerId: Swift.Int64? = nil,
@@ -9891,6 +9978,7 @@ public enum Components {
                 self.endLongitude = endLongitude
                 self.eta = eta
                 self.expectedDurationMinutes = expectedDurationMinutes
+                self.finishRequestedAt = finishRequestedAt
                 self.guidePreferenceText = guidePreferenceText
                 self.hasGuideDogThisRun = hasGuideDogThisRun
                 self.matchResultLatestAt = matchResultLatestAt
@@ -9906,6 +9994,7 @@ public enum Components {
                 self.plannedStart = plannedStart
                 self.preferredStartTime = preferredStartTime
                 self.primaryActionUnlockAt = primaryActionUnlockAt
+                self.rematchedMidRun = rematchedMidRun
                 self.routeNotes = routeNotes
                 self.routePreference = routePreference
                 self.run = run
@@ -9913,6 +10002,7 @@ public enum Components {
                 self.runnerTopColor = runnerTopColor
                 self.shareActive = shareActive
                 self.shareExpiresAt = shareExpiresAt
+                self.sosWindowEndsAt = sosWindowEndsAt
                 self.specialNotes = specialNotes
                 self.startAddress = startAddress
                 self.startLatitude = startLatitude
@@ -9922,6 +10012,7 @@ public enum Components {
                 self.tetherPreference = tetherPreference
                 self.timeFlexible = timeFlexible
                 self.travelMinutes = travelMinutes
+                self.unilateralFinishOpensAt = unilateralFinishOpensAt
                 self.visionLevel = visionLevel
                 self.volunteerAvgRating = volunteerAvgRating
                 self.volunteerId = volunteerId
@@ -9956,6 +10047,7 @@ public enum Components {
                 case endLongitude
                 case eta
                 case expectedDurationMinutes
+                case finishRequestedAt
                 case guidePreferenceText
                 case hasGuideDogThisRun
                 case matchResultLatestAt
@@ -9971,6 +10063,7 @@ public enum Components {
                 case plannedStart
                 case preferredStartTime
                 case primaryActionUnlockAt
+                case rematchedMidRun
                 case routeNotes
                 case routePreference
                 case run
@@ -9978,6 +10071,7 @@ public enum Components {
                 case runnerTopColor
                 case shareActive
                 case shareExpiresAt
+                case sosWindowEndsAt
                 case specialNotes
                 case startAddress
                 case startLatitude
@@ -9987,6 +10081,7 @@ public enum Components {
                 case tetherPreference
                 case timeFlexible
                 case travelMinutes
+                case unilateralFinishOpensAt
                 case visionLevel
                 case volunteerAvgRating
                 case volunteerId
@@ -11608,7 +11703,9 @@ public enum Components {
             public var priority: Swift.String
             /// 🚨 **这一单要不要先通电话**，客户端按它决定 `/respond` 发哪个 action：
             /// `true` → `INTERESTED`，`false` → `ACCEPT`。发错会被回 409 `INTRO_CALL_REQUIRED`。
-            /// 与接单守卫、`GET /api/orders/available` 用同一对判断。永远有值。
+            /// 与接单守卫、`GET /api/orders/available` 用同一个判断。永远有值。
+            /// #970 起磨合成功过的一对也是 `true`；`false` 只在通话功能整体关闭、或开跑之后才重新匹配的单上出现。
+            /// 距开跑已不够聊一轮的邀请不再列出（接单、有意向都会回 409 `ORDER_DISPATCH_MISMATCH`）。
             ///
             /// - Remark: Generated from `#/components/schemas/PendingInviteItem/requiresIntroCall`.
             public var requiresIntroCall: Swift.Bool
@@ -20809,7 +20906,7 @@ public enum Operations {
     ///    两侧各外扩 `app.order.booking-buffer-minutes`（默认 60）判区间相交。
     ///    🚩 **2026-09-05 起从「有任何未走完的单就拒绝」改成只拦时段冲突** —— 跨天预约上线后，
     ///    约了后天早上的单不该让人这两天里下不了任何单，而取消预约就抢不回那个志愿者了。
-    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 3）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
+    /// 8. **并发预约数**：未走完的单已达 `app.order.max-concurrent-scheduled`（默认 8）时拒绝，409 `TOO_MANY_SCHEDULED_ORDERS`。
     ///    这是第 7 条放开之后唯一的刷单闸门。
     ///    **取消次数闸（#826 M9）**：滚动 `app.order.cancel-limit-window-hours`（默认 24）小时内，**已开始派单**就被盲人自己取消的单满
     ///    `app.order.cancel-limit-count`（默认 5）张时拒绝，409 `ORDER_CANCEL_LIMIT_REACHED`，`message` 里带最早恢复下单的时刻。
@@ -23142,6 +23239,245 @@ public enum Operations {
             }
         }
     }
+    /// 盲人确认已在安全地点，结束陪跑
+    ///
+    /// 角色：`BLIND`（本单下单人）。陪跑员调 `POST /api/orders/{id}/finish` 之后（订单详情 `finishRequestedAt` 非空），
+    /// 盲人收到 `FINISH_SAFETY_CONFIRM_REQUESTED`（HIGH），确认自己已在安全地点后调本端点，订单进入 `COMPLETED`。
+    /// 结束前确认跑者在安全地点是负责人 2026-11-22 定的规则（#902）。盲人还不安全时**不要**调用：订单保持 `IN_PROGRESS`，
+    /// 位置互推、走散检测和号码都照常；陪跑员要等 `unilateralFinishOpensAt` 之后才能单方面结束。
+    ///
+    /// 与陪跑员结束走同一条完成逻辑（完成次数、积分、服务时长照常）。这一单还有未结束的紧急求助时返回 409 `ORDER_HAS_ACTIVE_EMERGENCY`。
+    ///
+    /// 幂等：已由本人确认完成的单重复调用返回 200。
+    ///
+    /// - Remark: HTTP `POST /api/orders/{id}/confirm-safe`.
+    /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)`.
+    public enum confirmSafe {
+        public static let id: Swift.String = "confirmSafe"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/path/id`.
+                public var id: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id:
+                public init(id: Swift.Int64) {
+                    self.id = id
+                }
+            }
+            public var path: Operations.confirmSafe.Input.Path
+            /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.confirmSafe.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.confirmSafe.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.confirmSafe.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.confirmSafe.Input.Path,
+                headers: Operations.confirmSafe.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/200/content/application\/json`.
+                    case json(OpenAPIRuntime.OpenAPIObjectContainer)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: OpenAPIRuntime.OpenAPIObjectContainer {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.confirmSafe.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.confirmSafe.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// 已确认，订单完成（或此前已确认过）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.confirmSafe.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.confirmSafe.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/403/content/application\/json`.
+                    case json(Components.Schemas.ApiErrorResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiErrorResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.confirmSafe.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.confirmSafe.Output.Forbidden.Body) {
+                    self.body = body
+                }
+            }
+            /// 不是本单的下单人（`NOT_ORDER_PARTICIPANT`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.confirmSafe.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.confirmSafe.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/confirm-safe/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ApiErrorResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiErrorResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.confirmSafe.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.confirmSafe.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// 陪跑员还没请求结束或订单不在服务中（`ORDER_STATUS_NOT_ALLOWED`）；或还有未结束的紧急求助（`ORDER_HAS_ACTIVE_EMERGENCY`）
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/{id}/confirm-safe/post(confirmSafe)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.confirmSafe.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.confirmSafe.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// 陪跑员已动身（真的出门了，开始双向推位置）
     ///
     /// ⚠️ **与 `/confirm-departure` 不是一回事，别弄混**：那一步只回答「你还去吗」，人可能还在家里；
@@ -23614,6 +23950,19 @@ public enum Operations {
     }
     /// 角色：`VOLUNTEER`（本单接单人）或 `BLIND`（本单下单人，#346）。仅接受 `IN_PROGRESS` （比状态迁移表更严：表里 `DRIVER_EN_ROUTE`/`DRIVER_ARRIVED` → `COMPLETED` 也是合法边， 但那条只给超时自动完成用）。
     ///
+    /// 🆕 **陪跑员结束分两步（#902，负责人 2026-11-22 定「结束前确认跑者在安全地点」）**：
+    /// 确认闸由 `app.order.finish-blind-confirm-timeout-minutes` 控制（负责人定 10 分钟；默认 0 = 关闭，此时陪跑员调用即完成，`completed=true`，
+    /// 支持两步结束的 iOS 上架后生产才打开）。闸开着时：
+    /// 第一次调用**不完成订单**，只记下请求（订单详情 `finishRequestedAt`）并推盲人 `FINISH_SAFETY_CONFIRM_REQUESTED`，
+    /// 响应 `completed=false`、`unilateralFinishOpensAt` = 请求时刻 + 上面那个分钟数。
+    /// 盲人调 `POST /api/orders/{id}/confirm-safe` 后订单完成。盲人一直没确认时，陪跑员在 `unilateralFinishOpensAt` 之后再调一次本端点，
+    /// 订单单方面完成（`completed=true`）；早于这个时刻返回 409 `BLIND_SAFETY_CONFIRMATION_PENDING`，message 可直接朗读，
+    /// 同时给盲人重推一次确认请求（距上次推送满 1 分钟才推）。
+    /// **结束请求自动失效**（负责人 2026-11-22 定）：请求只在「请求时刻 + 2 × 确认超时」（10 分钟时为 20 分钟）之前有效。
+    /// 过了这个时刻，陪跑员再调本端点等于重新请求：请求时刻换成现在、再推一次 `FINISH_SAFETY_CONFIRM_REQUESTED`、返回 `completed=false`，
+    /// 不会直接完成（盲人说过「还没到，继续陪」之后，隔很久再点仍要再问他一次）。
+    /// 不按位置判断。预定结束时间 + 60 分钟的自动完成不变。响应 `completed=true` 才表示订单已经结束。
+    ///
     /// **盲人结束**只在陪跑员掉线时放行：陪跑员已超过 `app.order.blind-finish-volunteer-offline-minutes` （默认 5 分钟）没有上报位置。判据由后端算，客户端不用自己判，按下去看返回即可： 陪跑员还在线时返回 409 `VOLUNTEER_STILL_ONLINE`，message 里带最早可以结束的时刻（可直接朗读）。 盲人结束的单对陪跑员照常算完成、积分和服务时长，与陪跑员结束走同一条逻辑， 只在订单状态日志里记下是盲人结束的。
     ///
     /// ⚠️ **这一单还有未结束的紧急求助时返回 409 `ORDER_HAS_ACTIVE_EMERGENCY`**（2026-09-15 新增）。 `COMPLETED` 是终态，一旦落下去：位置互推停掉（`sharesLiveLocation()` 不含它）、 `GET /{id}/location/address` 返回空、志愿者端 `GET /api/emergency/active` 的恢复入口也查不到了 —— 而求助未结案恰恰意味着现场可能还有人需要帮助。
@@ -23745,7 +24094,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// 订单不在 `IN_PROGRESS`；或这一单还有未结束的紧急求助 （errorCode `ORDER_HAS_ACTIVE_EMERGENCY`，两端都拦）；或盲人调用时陪跑员仍在上报位置 （errorCode `VOLUNTEER_STILL_ONLINE`）
+            /// 订单不在 `IN_PROGRESS`；或这一单还有未结束的紧急求助 （errorCode `ORDER_HAS_ACTIVE_EMERGENCY`，两端都拦）；或盲人调用时陪跑员仍在上报位置 （errorCode `VOLUNTEER_STILL_ONLINE`）；或陪跑员已请求结束、盲人还没确认且未到 `unilateralFinishOpensAt` （errorCode `BLIND_SAFETY_CONFIRMATION_PENDING`，#902）
             ///
             /// - Remark: Generated from `#/paths//api/orders/{id}/finish/post(finishOrder)/responses/409`.
             ///
@@ -26544,15 +26893,15 @@ public enum Operations {
     ///   存量志愿者已由 `migrations/0007_backfill_volunteer_verified.sql` 一次性放行（无感知），
     ///   仅新注册志愿者需先走 `POST /api/volunteer/verification` 上传证书并等待管理员审核。
     /// - 403 `VOLUNTEER_NOT_AVAILABLE` — 志愿者关闭了接单开关（`wantsDispatch=false`）
-    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你
+    /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你 / 邀请已失效。
+    ///   也包括「要先通话、距开跑已不够聊一轮」（#970）：`ACCEPT` 和 `INTERESTED` 都回这个，
+    ///   message 是「距开跑已不够先通一次电话，这一单不能再接了」，熟人也一样。
+    ///   例外：开跑之后才重新匹配的单不先通话，替补直接 `ACCEPT`（`requiresIntroCall=false`）
     /// - 409 `ORDER_ALREADY_ACCEPTED` — 已被他人接单 / 状态不允许接单
     /// - 409 `ORDER_CONCURRENT_CONFLICT` — 乐观锁并发冲突，可稍后重试
-    /// - 409 `INTRO_CALL_REQUIRED` — 没聊过的一对发了 `ACCEPT`，改发 `INTERESTED`
-    /// - 409 `INTRO_CALL_NOT_REQUIRED` — 已聊成过的一对发了 `INTERESTED`，改发 `ACCEPT`。
-    ///   正常流程走不到（`requiresIntroCall` 对熟人恒为 false），撞上通常是界面状态过期 /
-    ///   弱网重试 / 旧版客户端。⚠️ 后端**刻意不「顺手当 ACCEPT 处理」**：`INTERESTED` 不构成接单、
-    ///   聊崩了对志愿者没有统计损失，`ACCEPT` 当场把他绑在这一单上，静默转换等于替他做了承诺。
-    ///   客户端收到后按 `requiresIntroCall=false` 重发 `ACCEPT` 即可
+    /// - 409 `INTRO_CALL_REQUIRED` — 要求先通话的单发了 `ACCEPT`，改发 `INTERESTED`。
+    ///   #970 起磨合成功过的一对（含固定搭档）也会收到
+    /// - `INTRO_CALL_NOT_REQUIRED` — #970 起不再下发（熟人不再免通话）。旧版说明：已聊成过的一对发了 `INTERESTED`
     /// - 409 `INTRO_CALL_PAIR_BUSY` — 你和这位跑者正在为**另一张单**通话磨合，又对这一张发了 `INTERESTED`。
     ///   一对人同一时刻只能为一张单通话。提示先把那一单聊完：聊成了这一单直接 `ACCEPT`
     ///
@@ -26739,7 +27088,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// 未派给你（ORDER_DISPATCH_MISMATCH）/ 已被他人接单（ORDER_ALREADY_ACCEPTED）/ 并发冲突（ORDER_CONCURRENT_CONFLICT）/ 陌生人未先通话（INTRO_CALL_REQUIRED）/ 熟人不必再通话（INTRO_CALL_NOT_REQUIRED）/ 与同一跑者正为另一单通话（INTRO_CALL_PAIR_BUSY）
+            /// 未派给你（ORDER_DISPATCH_MISMATCH）/ 已被他人接单（ORDER_ALREADY_ACCEPTED）/ 并发冲突（ORDER_CONCURRENT_CONFLICT）/ 未先通话（INTRO_CALL_REQUIRED）/ 与同一跑者正为另一单通话（INTRO_CALL_PAIR_BUSY）
             ///
             /// - Remark: Generated from `#/paths//api/orders/{id}/respond/post(respondToDispatch)/responses/409`.
             ///
@@ -28896,7 +29245,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `text` 为空白或超过 200 字（errorCode `VALIDATION_ERROR`）；`type` 不是 `TEXT`（errorCode `BAD_REQUEST`）
+            /// `text` 为空白或超过 200 字（errorCode `VALIDATION_ERROR`）；`type` 不是 `TEXT`（errorCode `BAD_REQUEST`）；含拦截词（errorCode `CONTENT_BLOCKED`，不入库）
             ///
             /// - Remark: Generated from `#/paths//api/orders/{id}/run-record/messages/post(postMessage)/responses/400`.
             ///
@@ -29256,23 +29605,39 @@ public enum Operations {
                 }
             }
             public struct BadRequest: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/runner-message/PUT/responses/400/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/{id}/runner-message/PUT/responses/400/content/application\/json`.
+                    case json(Components.Schemas.ApiErrorResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiErrorResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.updateRunnerMessage.Output.BadRequest.Body
                 /// Creates a new `BadRequest`.
-                public init() {}
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.updateRunnerMessage.Output.BadRequest.Body) {
+                    self.body = body
+                }
             }
-            /// text 缺失或超过 40 字（`VALIDATION_ERROR`）
+            /// text 缺失或超过 40 字（`VALIDATION_ERROR`）；含拦截词（`CONTENT_BLOCKED`，不保存、不通知陪跑员）
             ///
             /// - Remark: Generated from `#/paths//api/orders/{id}/runner-message/put(updateRunnerMessage)/responses/400`.
             ///
             /// HTTP response code: `400 badRequest`.
             case badRequest(Operations.updateRunnerMessage.Output.BadRequest)
-            /// text 缺失或超过 40 字（`VALIDATION_ERROR`）
-            ///
-            /// - Remark: Generated from `#/paths//api/orders/{id}/runner-message/put(updateRunnerMessage)/responses/400`.
-            ///
-            /// HTTP response code: `400 badRequest`.
-            public static var badRequest: Self {
-                .badRequest(.init())
-            }
             /// The associated value of the enum case if `self` is `.badRequest`.
             ///
             /// - Throws: An error if `self` is not `.badRequest`.

@@ -68,8 +68,21 @@ extension VolunteerInServiceViewModel {
         let orders = appState.orders
         let orderID = order.orderId
         await submitTransition(target: .completed, orderID: orderID, appState: appState) {
-            try await orders.finish(orderId: orderID)
+            let response = try await orders.finish(orderId: orderID)
+            // 确认闸开着、这一下只记了请求（#902）：订单还在跑，不走「已提交，等状态确认」——
+            // 那条路等不到完成，会变成「状态还没确认」并锁住按钮。`submitTransition` 接住它。
+            if !response.completed { throw VolunteerFinishAwaitingBlind(opensAt: response.unilateralFinishOpensAt) }
         }
+    }
+
+    /// 第一次按结束、后端只记下请求：回到空闲，先把单方面结束的时刻写进手上这份订单（提示卡立刻出现），
+    /// 念一句，再重拉一次详情对齐。时刻只用后端给的，不自己加分钟数。
+    func recordFinishAwaitingBlind(_ pending: VolunteerFinishAwaitingBlind, orderID: Int64) async {
+        transitionState = .idle
+        errorMessage = nil
+        if order?.orderId == orderID, let opensAt = pending.opensAt { order?.unilateralFinishOpensAt = opensAt }
+        speechService?.speak(FinishSafetyCopy.volunteerRequested(opensAt: pending.opensAt))
+        await load(orderId: orderID, speakChanges: false)
     }
 
     func retryTransitionConfirmation() {
