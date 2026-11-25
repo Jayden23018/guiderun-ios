@@ -17,7 +17,6 @@ extension IntroCallCopy {
 
     // MARK: 陪跑员侧 · 「不合适」「未接到来电」的确认
 
-    static let volunteerDeclineAccessibilityHint = "结束这次通话确认，系统会把此订单派给下一位"
     static let volunteerDeclineConfirmTitle = "确认不合适？"
     static let volunteerDeclineConfirmMessage = "确认后，这次沟通结束，系统会把此订单派给下一位陪跑员。"
     static let volunteerDeclineConfirmButton = "确认不合适"
@@ -33,14 +32,14 @@ extension IntroCallCopy {
     /// 5 分钟后再给这个出口，仍留出大半个窗口给下一位候选人。
     static let volunteerUnreachableDelayMinutes = 5
 
-    /// 「未接到来电」还没出现时，原位置那一行字。让人知道出口在哪、什么时候出现。
-    static let volunteerUnreachablePendingNotice =
-        "跑者可能还在准备拨号。\(volunteerUnreachableDelayMinutes) 分钟后仍没接到来电，可在这里告诉系统。"
+    /// 「未接到来电」可用之前，「···」里那一项灰着，第二行写这句：让人知道什么时候能点。
+    static let volunteerUnreachablePendingNotice = "进页 \(volunteerUnreachableDelayMinutes) 分钟后可用"
 
     // MARK: 陪跑员侧 · 聊完提醒提交（V-19）
 
     /// App 不知道电话打完了没有，「合适」只能靠提交见面安排表达。没提交就会等到窗口超时。
-    static let volunteerSubmitReminder = "聊完记得在这里提交结果：合适就填写见面安排，不合适就按「不合适」。"
+    /// 2026-11-25 起「不合适」收进右上角「···」，这句跟着指过去。
+    static let volunteerSubmitReminder = "聊完记得回来填写见面安排；不合适点右上角「···」。"
     /// 跑者来电提醒播完后接着念的半句。短一点：这时他可能正要接电话。
     static let volunteerSubmitReminderSpeech = "聊完记得回到这一页提交结果。"
 }

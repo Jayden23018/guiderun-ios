@@ -176,10 +176,11 @@ extension AccessibilityAuditTests {
         let volunteer = launchVolunteerHome(seedOrderStatus: "PENDING_INTRO_CALL")
         let header = volunteer.descendants(matching: .any)["volunteerIntroCallHeader"].firstMatch
         XCTAssertTrue(header.waitForExistence(timeout: 20), "没到陪跑员通话页")
-        let report = revealButton(volunteer, "counterpartReportButton")
-        XCTAssertGreaterThanOrEqual(report.frame.height, 63.5)
+        // 2026-11-25 起陪跑员通话页也收进顶栏「···」，同盲人端。
+        XCTAssertFalse(volunteer.buttons["counterpartReportButton"].exists, "举报不该再铺在页面里")
+        _ = openOrderMenuItem(volunteer, menu: "volunteerOrderNavMoreMenu", item: "counterpartReportButton")
         XCTAssertTrue(volunteer.buttons["counterpartBlockButton"].exists)
-        attachScreenshot(volunteer, name: "volunteer-intro-call-safety-actions")
+        attachScreenshot(volunteer, name: "volunteer-intro-call-safety-menu")
     }
 
     /// 拉黑后这一行消失，下一位不能接手「已拉黑」的状态：行按 userId 当身份，详情页靠 `.id(target.userId)` 隔开。

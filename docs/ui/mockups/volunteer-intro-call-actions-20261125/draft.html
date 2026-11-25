@@ -1,0 +1,159 @@
+<!doctype html><html lang="zh-Hans"><head><meta charset="utf-8"><title>陪跑员「先通个电话」页底部收敛（2026-11-25）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;background:#E9EAEE;color:#14171F;padding:28px 32px 40px}
+h1{font-size:22px;margin-bottom:6px}
+.lead{font-size:13px;color:#4A4F5C;line-height:1.7;max-width:1300px;margin-bottom:22px}
+.g{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.cell{width:390px}
+.cap{font-size:14px;font-weight:600;margin:12px 0 4px}
+.ref{display:inline-block;font-size:12px;font-weight:600;background:#DDE6FF;color:#1E2A6E;border-radius:4px;padding:1px 6px;margin-bottom:6px}
+.anno{margin-top:6px;padding:12px 14px;background:#fff;border-radius:12px;font-size:12px;color:#4A4F5C;line-height:1.6}
+.ph{width:390px;height:844px;border-radius:44px;overflow:hidden;position:relative;background:#fff;box-shadow:0 0 0 10px #111,0 10px 30px rgba(0,0,0,.25)}
+.tp{position:absolute;left:0;right:0;top:0;height:96px;padding:44px 16px 0;display:flex;align-items:center;gap:10px;z-index:5}
+.rd{width:44px;height:44px;border-radius:22px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.rd.dk{background:rgba(255,255,255,.12);box-shadow:none;color:#fff}
+.sos{height:44px;padding:0 16px;border-radius:22px;background:#fff;color:#D7263D;font-weight:700;font-size:16px;display:flex;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.sos.od{background:transparent;border:1.5px solid #FF8C95;color:#FF9AA2;box-shadow:none}
+.sos.lv{background:#D7263D;color:#fff}
+.bk{color:#A8C8FF;font-size:16px}.sp{flex:1}
+.hero{background:linear-gradient(115deg,#252A38 0%,#2C3243 55%,#353C4F 100%);height:232px;padding:108px 24px 0;color:#fff}
+.hero .k{font-size:15px;color:#C9CFDB;margin-bottom:6px}.hero .t{font-size:30px;font-weight:700;color:#A8C8FF;line-height:1.25}
+.sh{position:absolute;left:0;right:0;top:212px;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:24px 24px 0}
+.pl{font-size:20px;font-weight:700}.sb{font-size:15px;color:#4A4F5C;margin-top:4px}
+.n{display:flex;gap:14px;position:relative;padding-bottom:13px}
+.n:before{content:"";position:absolute;left:10px;top:24px;bottom:-2px;width:3px;background:#C5C8CF}
+.n.d:before{background:#1F2433}.n:last-child:before{display:none}
+.wide .n{padding-bottom:22px}.wide .n:last-child{padding-bottom:0}
+.dt{width:23px;height:23px;border-radius:12px;flex:none;background:#C5C8CF;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+.d .dt,.w .dt{background:#1F2433}.w .dt{box-shadow:0 0 0 4px rgba(31,36,51,.16)}.x .dt{background:#8A8F9A}
+.nl{font-size:17px;font-weight:600;line-height:23px}
+.f .nl{font-size:15px;font-weight:500;color:#4A4F5C}
+.m .dt{background:#fff;border:2.5px solid #C5C8CF}.m .nl{font-size:15px;color:#2F4BD6}
+.t2 .nl{color:#5F6470;font-weight:500}.g2 .nl{color:#8A8F9A;font-weight:500}
+.pre{font-size:13px;color:#5F6470;margin-right:8px}
+.nd{font-size:14px;color:#4A4F5C;margin-top:2px}
+.cd{margin-top:10px;border-radius:14px;overflow:hidden;background:#EEEFF2}
+.cd .dk{background:#2E3445;color:#fff;padding:12px 16px}.cd .dk p{font-size:13px;color:#C9CFDB}.cd .dk h3{font-size:20px;margin-top:2px}
+.cd .lt{display:flex;align-items:center;gap:14px;padding:12px 16px;font-size:15px}
+.av{width:48px;height:48px;border-radius:24px;background:#A9C8F7;color:#1F3A66;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex:none}
+.bt{position:absolute;left:24px;right:24px;bottom:30px}
+.cta{height:56px;border-radius:28px;background:#1F2433;color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.cta.gh{background:#fff;color:#14171F;border:1.5px solid #C9CCD3}
+.tx{text-align:center;font-size:16px;color:#4A4F5C;height:44px;line-height:44px}
+.cap2{font-size:13px;color:#4A4F5C;text-align:center;margin-bottom:6px}
+.map{position:absolute;left:0;right:0;top:0;height:430px;background:#EDEBE6;overflow:hidden}
+.map.short{height:380px}
+.park{position:absolute;left:0;top:40px;width:262px;height:290px;background:#D9E8CF}
+.lake{position:absolute;left:40px;top:120px;width:90px;height:60px;border-radius:50%;background:#B9D7F0}
+.road{position:absolute;background:#fff}
+.pv{position:absolute;width:34px;height:34px;border-radius:17px;background:#1F2433;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.me{position:absolute;width:18px;height:18px;border-radius:9px;background:#2F7BF6;border:3px solid #fff;box-shadow:0 0 0 12px rgba(47,123,246,.16)}
+.mp{position:absolute;padding:6px 10px;border-radius:14px;background:#1F2433;color:#fff;font-size:13px;font-weight:600;white-space:nowrap}
+.ms{position:absolute;left:0;right:0;top:404px;bottom:0;background:#fff;border-radius:22px 22px 0 0;padding:22px 24px 0;box-shadow:0 -4px 16px rgba(0,0,0,.08)}
+.ms.tall{top:354px}
+.grab{width:40px;height:5px;border-radius:3px;background:#C9CCD3;margin:-10px auto 14px}
+.st{font-size:27px;font-weight:700;line-height:1.25}.ss{font-size:16px;color:#2F4BD6;margin-top:4px}.ss.gr{color:#4A4F5C}
+.who{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #E6E7EB;border-top:1px solid #E6E7EB;margin-top:12px}
+.who .nn{font-size:19px;font-weight:700}.who .dd{font-size:14px;color:#4A4F5C}
+.chip{margin-left:auto;height:44px;padding:0 14px;border-radius:22px;background:#EEEFF2;font-size:15px;font-weight:600;display:flex;align-items:center}
+.ln{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid #E6E7EB;font-size:17px}.ln span{font-size:14px;color:#4A4F5C}
+.chips{display:flex;gap:10px;margin-top:12px}.chips div{flex:1;height:48px;border-radius:24px;background:#EEEFF2;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.stats{display:flex;gap:26px;margin-top:12px;align-items:flex-end}.big{font-size:44px;font-weight:700;line-height:1}.big small{font-size:18px;margin-left:2px}.stats p{font-size:13px;color:#4A4F5C}.stats b{font-size:22px}
+.bar{height:8px;border-radius:4px;background:#E6E7EB;margin-top:14px;overflow:hidden}.bar i{display:block;height:8px;width:48%;background:#1F2433}
+.tip{margin-top:12px;background:#FFF3C4;border-radius:12px;padding:10px 14px;font-size:15px;color:#5A4500}
+.res{margin-top:16px;background:#1E7A46;border-radius:16px;padding:16px 18px;color:#fff}
+.res .big{font-size:44px}.res .three{display:flex;gap:32px;margin-top:14px}.res p{font-size:13px;color:#D5EEDD}.res b{font-size:20px}
+.star{margin-top:14px;border:1px solid #E6E7EB;border-radius:16px;padding:14px 16px}
+.star .h{display:flex;justify-content:space-between;font-size:16px;font-weight:600}.star .h span{font-size:14px;color:#4A4F5C;font-weight:400}
+.star .bar i{width:62%;background:#1E7A46;border-radius:4px}
+.box{margin-top:22px;background:#F4F5F8;border-radius:16px;padding:4px 16px}
+.row{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #E6E7EB;font-size:16px}.row:last-child{border-bottom:none}.row span{color:#4A4F5C;font-size:15px}
+.lp{height:56px;border-radius:28px;background:#1F2433;color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.lp i{position:absolute;left:0;top:0;bottom:0;width:30%;background:rgba(255,255,255,.18)}
+.bt2{position:absolute;left:0;right:0;bottom:0;padding:10px 24px 30px;background:#fff;border-top:1px solid #E6E7EB}
+.gb{height:56px;border-radius:28px;background:#fff;color:#14171F;border:1.5px solid #C9CCD3;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:12px}
+.note{font-size:14px;color:#4A4F5C;text-align:center;line-height:1.5;margin-top:10px}
+.bad{outline:3px dashed #D7263D;outline-offset:3px;border-radius:12px}
+.menu{position:absolute;right:76px;top:96px;width:236px;background:rgba(250,250,252,.97);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.35);z-index:9;overflow:hidden;font-size:17px}
+.menu div{padding:13px 16px;border-bottom:1px solid #E1E2E6}.menu div:last-child{border-bottom:none}
+.menu .sep{height:8px;padding:0;background:#E6E7EB}
+.menu .red{color:#D7263D}.menu .off{color:#A3A7B0}.menu small{display:block;font-size:12px;color:#8A8F9A;margin-top:2px}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.18);z-index:8}
+.cd .info{padding:12px 16px;font-size:15px;display:flex;justify-content:space-between}
+.tag{display:inline-block;background:#DDE6FF;color:#1E2A6E;border-radius:4px;font-size:12px;padding:1px 6px;margin-left:6px}
+</style></head><body>
+<h1>陪跑员「先通个电话」页：底部只留一枚主按钮，其余收进右上角「···」</h1>
+<p class="lead">负责人 2026-11-25：举报 / 不再匹配此人不要常驻，收进求助左边的「···」（同盲人端）；「填写见面安排」那块底栏占了小半屏、像贴图；「不合适」按钮太大。<br>
+这其实就是 11-11 v7 定稿 ②③ 的画法（<code>volunteer-order-v7-20261111/</code>），当时实现没照稿：「不合适」「未接到来电」留在底部，举报 / 不再匹配留在正文。本稿把实现拉回定稿，并补上「···」展开后的样子。地点、姓名为示例。</p>
+<div class="g">
+
+<!-- 现状 -->
+<div class="cell"><div class="ph">
+ <div class="tp"><span class="bk">‹ 返回</span><span class="sp"></span><div class="sos od">求助</div></div>
+ <div class="hero"><div class="k">先通个电话 · 朝阳公园南门 · 2.3 公里</div><div class="t">等待跑者陈来电</div></div>
+ <div class="sh" style="bottom:290px;overflow:hidden">
+  <div class="n d"><div class="dt">✓</div><div><div class="nl">已接下陪跑</div></div></div>
+  <div class="n w"><div class="dt"></div><div style="flex:1"><div class="nl">商量见面安排</div><div class="nd">剩余 19 分钟</div>
+   <div class="cd"><div class="dk"><p style="font-size:16px;color:#fff;font-weight:600">来电号码 138****1234<br>聊完记得在这里提交结果：合适就填写见面安排，不合适就按「不合适」。</p></div></div></div></div>
+  <div class="bad" style="margin-top:6px"><div class="gb" style="margin-top:0">举报</div><div class="gb">不再匹配此人</div></div>
+ </div>
+ <div class="bt2 bad" style="outline-offset:-3px">
+  <div class="cta">填写见面安排</div>
+  <div class="gb">不合适</div>
+  <div class="note">跑者可能还在准备拨号。5 分钟后仍没接到来电，可在这里告诉系统。</div>
+ </div>
+</div>
+<div class="cap">现在（main 上的实现）</div><span class="ref" style="background:#FFE0E3;color:#8A1020">问题</span>
+<div class="anno">红框两处：① 底栏叠了实心 + 整宽「不合适」+ 两行说明，约占屏幕下方 1/3，固定不动；② 举报、不再匹配此人是两枚整宽按钮，摆在正文显眼处。三枚大按钮同时出现，看起来在鼓励「不合适 / 举报」。</div></div>
+
+<!-- 改后 ② -->
+<div class="cell"><div class="ph">
+ <div class="tp"><span class="bk">‹ 返回</span><span class="sp"></span><div class="rd dk">···</div><div class="sos od">求助</div></div>
+ <div class="hero"><div class="k">先通个电话 · 朝阳公园南门 · 2.3 公里</div><div class="t">等待跑者陈来电</div></div>
+ <div class="sh">
+  <div class="n d"><div class="dt">✓</div><div><div class="nl">已接下陪跑</div></div></div>
+  <div class="n w"><div class="dt"></div><div style="flex:1"><div class="nl">商量见面安排</div><div class="nd">剩余 19 分钟</div>
+   <div class="cd"><div class="dk"><p style="font-size:16px;color:#fff;font-weight:600">来电号码 138****1234<br>聊完记得回来填写见面安排；不合适点右上角「···」。</p></div></div>
+   <div class="cd"><div class="info"><span style="color:#4A4F5C">配速</span><b>轻松跑</b></div></div></div></div>
+  <div class="n f"><div class="dt"></div><div class="nl"><span class="pre">下一步</span>等出发</div></div>
+ </div>
+ <div class="bt2"><div class="cta">填写见面安排</div></div>
+</div>
+<div class="cap">改后 ② 等跑者来电</div><span class="ref">照：v7 定稿 ② · 盲人端 ② 底部只一枚「打电话」</span>
+<div class="anno">底栏只剩一枚深色「填写见面安排」，高度与盲人端底部按钮相同（52pt 胶囊、整行 64pt 可点、上沿一条细线）。提醒句改成指向「···」。正文不再有举报 / 不再匹配按钮。</div></div>
+
+<!-- 菜单 -->
+<div class="cell"><div class="ph">
+ <div class="tp"><span class="bk">‹ 返回</span><span class="sp"></span><div class="rd dk" style="background:rgba(255,255,255,.3)">···</div><div class="sos od">求助</div></div>
+ <div class="hero"><div class="k">先通个电话 · 朝阳公园南门 · 2.3 公里</div><div class="t">等待跑者陈来电</div></div>
+ <div class="sh"><div class="n d"><div class="dt">✓</div><div><div class="nl">已接下陪跑</div></div></div><div class="n w"><div class="dt"></div><div><div class="nl">商量见面安排</div></div></div></div>
+ <div class="dim"></div>
+ <div class="menu">
+  <div>不合适</div>
+  <div class="off">未接到来电<small>进页 5 分钟后可用</small></div>
+  <div class="sep"></div>
+  <div>举报</div>
+  <div class="red">不再匹配此人</div>
+  <div>这一单的消息</div>
+ </div>
+ <div class="bt2"><div class="cta">填写见面安排</div></div>
+</div>
+<div class="cap">改后 ② 点开「···」</div><span class="ref">照：陪跑员订单页「···」（我去不了 + 举报 / 不再匹配）</span>
+<div class="anno">分两组：上面是这次沟通的结果（不合适、未接到来电），下面是对人的动作和这一单的消息（顺序同订单页「···」）。点任何一项仍先弹原来的确认框（「确认不合适？」「确认没有接到来电？」「不再匹配此人」），确认文案不变。「未接到来电」前 5 分钟灰着并写明何时可用（原规则 #660 V-9 不变）。</div></div>
+
+<!-- 改后 ③ -->
+<div class="cell"><div class="ph">
+ <div class="tp"><span class="bk">‹ 返回</span><span class="sp"></span><div class="rd dk">···</div><div class="sos od">求助</div></div>
+ <div class="hero"><div class="k">已提交见面安排 · 明天 7:30 · 朝阳公园东门</div><div class="t">等待跑者陈确认</div></div>
+ <div class="sh">
+  <div class="n d"><div class="dt">✓</div><div class="nl t2">已完成 1 步 ›</div></div>
+  <div class="n w"><div class="dt"></div><div style="flex:1"><div class="nl">商量见面安排</div><div class="nd">已等 2 分钟 · 跑者确认后即完成约定</div>
+   <div class="box" style="margin-top:12px"><div class="row"><span>开跑时间</span>明天 7:30<i class="tag">已变更</i></div><div class="row"><span>在哪见</span>朝阳公园东门</div><div class="row"><span>跑者上衣</span>蓝色</div><div class="row"><span>你的上衣</span>黄色</div></div></div></div>
+ </div>
+ <div class="bt2"><div class="gb" style="margin-top:0">修改见面安排</div></div>
+</div>
+<div class="cap">改后 ③ 等跑者确认</div><span class="ref">照：v7 定稿 ③</span>
+<div class="anno">底部只留白底描边「修改见面安排」（此刻没有该他做的主动作，不放深色）。原来按钮下面那行文字「不合适」收进「···」；这一态「···」里没有「未接到来电」（已提交 = 电话通了）。</div></div>
+
+</div></body></html>

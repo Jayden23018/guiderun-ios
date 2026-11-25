@@ -335,7 +335,6 @@ enum IntroCallCopy {
 
     /// 🚩 **「未接到来电」只在志愿者侧**，这处不对称是刻意的（见 `IntroCallEndpoint`）。
     static let volunteerUnreachableButtonTitle = "未接到来电"
-    static let volunteerUnreachableAccessibilityHint = "告诉系统这通电话没有打通，系统会把此订单派给下一位"
 
     /// 本轮结束、但这一单不是你的（V4′）。中性、不归因 —— 跑者不合适、超时、跑者取消**全部同一句**。
     ///
