@@ -23,6 +23,8 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
     @EnvironmentObject private var amapGeocodingService: AMapGeocodingService
 
     @StateObject private var presenter = VolunteerEmergencyWindowPresenter()
+    /// 上一次看到的警报事件号：警报从有变无时念一句（`onChange` 拿不到旧值，iOS 16）。
+    @State private var shownAlertEventID: Int64?
 
     static let acknowledgeFailure = "确认失败，请重试。若情况危急请立即拨打120或110。"
 
@@ -50,6 +52,24 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
                     if attempt < 2 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
                     if Task.isCancelled { return }
                 }
+            }
+            // 后端求助结束时不给陪跑员推事件：警报挂着就定时问一次（`keepVolunteerAlertFresh`）。
+            .task(id: coordinator.volunteerAlert?.eventID) {
+                await coordinator.keepVolunteerAlertFresh(safety: appState.safety)
+            }
+            // 整条流用 async（仓库约定不在同一条数据流里混 Combine 订阅和 await）。
+            .task {
+                for await update in appState.realtimeCoordinator.statusUpdatePublisher.values {
+                    await coordinator.handleVolunteerAlertOrderStatus(orderID: update.orderId, status: update.toStatus, safety: appState.safety)
+                }
+            }
+            .onAppear { shownAlertEventID = coordinator.volunteerAlert?.eventID }
+            .onChange(of: coordinator.volunteerAlert?.eventID) { eventID in
+                // 收起时念一句，不悄悄消失；退出登录、切换角色时（`reset()`）不念。
+                if eventID == nil, shownAlertEventID != nil, appState.isLoggedIn, appState.activeRole == .volunteer {
+                    speechService.speak(EmergencySafetyCopy.volunteerAlertCleared)
+                }
+                shownAlertEventID = eventID
             }
     }
 
@@ -104,6 +124,14 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
 
     private static let barHeight: CGFloat = 44
     private static let barWidth: CGFloat = 220
+    /// 订单页自定义顶栏那一行的高度（返回 / 更多操作 / 求助都是 64pt 的按钮，`FlowOrderNavBar`）。
+    /// 红条放在这一行下面：放进这一行会盖住「更多操作」（#1024 真机走查）。
+    private static let topBarRowHeight: CGFloat = 64
+    /// 顶栏按钮随字号变高，但有上限：AX-XXXL 真机实测最高的是陪跑员首页「设置」88pt（#1024）。取 96 留余量。
+    private static let topBarRowMaxHeight: CGFloat = 96
+    private static let barGapBelowTopBar: CGFloat = 4
+    /// 左右各留的边距：最大字号时红条按字号放宽，但不贴屏幕边。
+    private static let barSideMargin: CGFloat = 16
 
     func hide() {
         shownMode = .none
@@ -130,13 +158,21 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
             window.backgroundColor = UIColor(AppColors.background)
             window.makeKeyAndVisible()
         } else {
-            // 只占顶栏正中一小块：全宽的条会盖住每一页导航栏左右两侧的返回 / 操作按钮，
+            // 只占顶栏下面正中一小块：全宽的条、或放进顶栏那一行，都会盖住返回 / 更多操作 / 求助，
             // 而求助期间陪跑员最需要的就是能退出、能操作。窗口只有这一块，其余触摸照常落到下面的页面。
-            let top = scene.windows.first?.safeAreaInsets.top ?? 0
-            let width = min(Self.barWidth, scene.coordinateSpace.bounds.width * 0.6)
+            // 尺寸按字号放大（文字是 caption），否则最大字号时字被裁掉；创建时取一次。
+            let top = scene.windows.first { $0 !== window }?.safeAreaInsets.top ?? 0
+            let screenWidth = scene.coordinateSpace.bounds.width
+            let metrics = UIFontMetrics(forTextStyle: .caption1)
+            let width = min(metrics.scaledValue(for: Self.barWidth), screenWidth - 2 * Self.barSideMargin)
+            let topBarRow = min(UIFontMetrics(forTextStyle: .body).scaledValue(for: Self.topBarRowHeight), Self.topBarRowMaxHeight)
             window.frame = CGRect(
-                x: (scene.coordinateSpace.bounds.width - width) / 2, y: top, width: width, height: Self.barHeight
+                x: (screenWidth - width) / 2, y: top + topBarRow + Self.barGapBelowTopBar,
+                width: width, height: metrics.scaledValue(for: Self.barHeight)
             )
+            // 常驻条的窗口不在屏幕顶上，宿主仍按整屏的安全区把内容往下推：真机上文字掉出窗口、红底拉到约 100pt（#1024 走查）。
+            // 只对常驻条关安全区：整屏警报要照常避开状态栏与底部横条。
+            if #available(iOS 16.4, *) { host.safeAreaRegions = [] }
             window.isHidden = false
         }
         self.window = window
@@ -187,9 +223,12 @@ struct VolunteerEmergencyWindowContent: View {
                 Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                 Text("求助中 · 回到警报")
                     .font(AppFonts.caption().weight(.bold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColors.destructive)
         }
         .buttonStyle(.plain)

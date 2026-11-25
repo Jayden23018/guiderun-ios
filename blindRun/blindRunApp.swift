@@ -63,7 +63,7 @@ enum RecognitionLifecyclePolicy {
 struct blindRunApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var appState = AppState()
+    @StateObject var appState = AppState()
     private var pushNotificationsManager: PushNotificationsManager { appDelegate.pushNotificationsManager }
     @StateObject private var speechService = SpeechService()
     @StateObject private var speechInputService = SpeechInputService()
@@ -104,7 +104,7 @@ struct blindRunApp: App {
                     #if DEBUG || DEMO
                     applyUITestLaunchConfigurationIfNeeded()
                     injectUITestRealtimeNotificationsIfNeeded()
-                    injectUITestVolunteerLostIfNeeded()
+                    injectUITestScenariosIfNeeded()
                     #endif
                     // 在任何一句播报之前把音频分类定下来。不做的话冷启动到第一次录音之间
                     // 会话一直是系统默认的 `.soloAmbient`，合成器得自己去协商，第一句话
@@ -262,7 +262,7 @@ struct blindRunApp: App {
     /// `AIDRUN_UI_TEST_VOLUNTEER_LOST_AFTER_SECONDS`（#456）：启动 N 秒后演一次陪跑员失联 ——
     /// Mock 里那一单转 `REMATCHING`，再按后端 `handleVolunteerLost` 的顺序喂两条：
     /// 先不带 `orderId` 的 `ORDER_VOLUNTEER_LOST`，后 `ORDER_STATUS_CHANGED`（→`REMATCHING`）。
-    private func injectUITestVolunteerLostIfNeeded() {
+    func injectUITestVolunteerLostIfNeeded() {
         #if DEBUG
         guard let raw = ProcessInfo.processInfo.environment["AIDRUN_UI_TEST_VOLUNTEER_LOST_AFTER_SECONDS"],
               let seconds = Double(raw) else { return }
