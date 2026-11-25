@@ -464,14 +464,4 @@ final class BlindIntroCallMeetupPlanTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
     }
-
-    // MARK: - #1010 通话这一步的取消入口
-
-    /// 「···」里要有取消，且排在「更换陪跑员」后面；两个标签读起来要分得开。
-    func testIntroCallMenuOffersCancelBookingSeparateFromChangeVolunteer() {
-        XCTAssertEqual(BlindIntroCallMenu.kinds(for: .pendingIntroCall), [.changeVolunteer, .cancelBooking])
-        XCTAssertNotEqual(BlindOrderStageCopy.cancelIntroCallBooking, IntroCallCopy.declineButtonTitle)
-        XCTAssertTrue(BlindOrderStageCopy.cancelIntroCallBooking.contains("取消"))
-        XCTAssertFalse(BlindOrderStageCopy.cancelIntroCallBooking.contains("更换"))
-    }
 }

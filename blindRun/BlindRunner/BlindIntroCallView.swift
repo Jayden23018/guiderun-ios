@@ -287,26 +287,7 @@ struct BlindIntroCallView<Footer: View>: View {
     // MARK: - 动作
 
     private var menuItems: [BlindOrderMenuItem] {
-        BlindIntroCallMenu.kinds(for: order.status).compactMap { kind -> BlindOrderMenuItem? in
-            switch kind {
-            case .cancelBooking:
-                return BlindOrderMenuItem(kind: kind, title: BlindOrderStageCopy.cancelIntroCallBooking, isDestructive: true) {
-                    onCancelBooking()
-                }
-            case .changeVolunteer:
-                return declineMenuItem
-            case .shareRunPlan, .runnerMessage, .reportCounterpart, .blockCounterpart:
-                // 这几项不由本页给（举报 / 不再匹配由订单页接在后面）；`BlindIntroCallMenu` 不会产出它们。
-                assertionFailure("BlindIntroCallMenu 不该产出 \(kind)")
-                return nil
-            }
-        }
-    }
-
-    private var declineMenuItem: BlindOrderMenuItem {
-        BlindOrderMenuItem(kind: .changeVolunteer, title: IntroCallCopy.declineButtonTitle) {
-            confirmsDecline = true
-        }
+        BlindIntroCallMenu.items(for: order.status, decline: { confirmsDecline = true }, cancel: onCancelBooking)
     }
 
     /// 拨号。**先通知对方再立刻拨**，不等响应（理由在 `introCallDialURL` 上）。

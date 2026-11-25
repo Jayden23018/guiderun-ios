@@ -33,6 +33,17 @@ enum BlindIntroCallMenu {
         if status.canBlindRunnerCancel { kinds.append(.cancelBooking) }
         return kinds
     }
+
+    static func items(for status: RunOrderStatus, decline: @escaping () -> Void, cancel: @escaping () -> Void) -> [BlindOrderMenuItem] {
+        kinds(for: status).map { kind in
+            switch kind {
+            case .cancelBooking:
+                BlindOrderMenuItem(kind: kind, title: BlindOrderStageCopy.cancelIntroCallBooking, isDestructive: true, action: cancel)
+            default:
+                BlindOrderMenuItem(kind: kind, title: IntroCallCopy.declineButtonTitle, action: decline)
+            }
+        }
+    }
 }
 
 /// ①–④ 上的新句子。**既有的句子不在这里重写**，直接取原常量。
