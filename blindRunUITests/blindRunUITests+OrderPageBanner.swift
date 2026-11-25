@@ -4,21 +4,32 @@ import XCTest
 ///
 /// 首页的同类用例（`testForegroundBannerDismissReachesWellBelowItsTextLine`）一直是绿的，订单页却关不掉：
 /// 横幅挂在 `ContentView` 上，而 `ContentView` 没订阅 `realtimeCoordinator`，订单页上没有别的东西让它重画。
-/// 两端订单页各一条。冷启动直接落在跑步中的订单页上，`AIDRUN_UI_TEST_REALTIME_PRIORITY` 推一条普通、一条高优先级。
+/// 两端订单页各一条。陪跑员端冷启动直接落在跑步中页，`AIDRUN_UI_TEST_REALTIME_PRIORITY` 推一条普通、一条高优先级。
 extension blindRunUITests {
+    /// 跑者端：横幅要在订单页上出现才验得到（启动时那两条到点就自己走了，等不到订单页）。
+    /// 借 `AIDRUN_UI_TEST_VOLUNTEER_LOST_AFTER_SECONDS`：已到达的单 12 秒后被转走，订单页上弹一条横幅。
+    /// 这里只验「不碰它，到点自己消失」；同一页上「点关闭」由 `testWalk_MidRunDepartureRematchPage` 验。
     @MainActor
-    func testRunnerOrderPageBannerClosesOnTapAndTimesOut() {
+    func testRunnerOrderPageBannerTimesOut() {
         let app = launchApp(
             apiEnvironment: "mock",
             accessToken: "mock_jwt_token_for_testing",
             activeRole: "blind_runner",
             preseedBlindProfile: true,
-            seedOrderStatus: "IN_PROGRESS",
-            realtimePriorityTest: true
+            seedOrderStatus: "DRIVER_ARRIVED"
         )
+        // 开关只给这一条用：不往 `launchApp` 加参数（那个函数已超长），带上开关重启一次。
+        app.terminate()
+        app.launchEnvironment["AIDRUN_UI_TEST_VOLUNTEER_LOST_AFTER_SECONDS"] = "12"
+        app.launch()
         let card = app.descendants(matching: .any)["blindRunnerHomeOrderCard"].firstMatch
         if card.waitForExistence(timeout: 10) { card.tap() }
-        assertOrderPageBannerClosesAndTimesOut(app)
+        let banner = app.descendants(matching: .any)["realtimeForegroundNotification"].firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 30), "前提：订单页上没有横幅")
+        attachScreenshot(named: "runner-order-page-banner", app: app)
+        let timedOut = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: banner)
+        wait(for: [timedOut], timeout: 9)
+        attachScreenshot(named: "runner-order-page-banner-after", app: app)
     }
 
     @MainActor
