@@ -287,14 +287,18 @@ struct BlindIntroCallView<Footer: View>: View {
     // MARK: - 动作
 
     private var menuItems: [BlindOrderMenuItem] {
-        BlindIntroCallMenu.kinds(for: order.status).map { kind in
+        BlindIntroCallMenu.kinds(for: order.status).compactMap { kind -> BlindOrderMenuItem? in
             switch kind {
             case .cancelBooking:
                 return BlindOrderMenuItem(kind: kind, title: BlindOrderStageCopy.cancelIntroCallBooking, isDestructive: true) {
                     onCancelBooking()
                 }
-            default:
+            case .changeVolunteer:
                 return declineMenuItem
+            case .shareRunPlan, .runnerMessage, .reportCounterpart, .blockCounterpart:
+                // 这几项不由本页给（举报 / 不再匹配由订单页接在后面）；`BlindIntroCallMenu` 不会产出它们。
+                assertionFailure("BlindIntroCallMenu 不该产出 \(kind)")
+                return nil
             }
         }
     }
