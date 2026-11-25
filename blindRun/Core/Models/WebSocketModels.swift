@@ -143,6 +143,12 @@ nonisolated struct WSAppNotification: Decodable, Sendable {
     let orderId: Int64?
     /// 只有 `RUNNER_RING` 带：响到这一刻为止（后端 `LocalDateTime`，无时区）。
     let until: String?
+    /// 陪跑员端 `INTRO_CALL_CLOSED*` 带：通话这一轮为什么结束（backend#1055）。开放枚举，解读见 `IntroCallCloseCause`。
+    let closeCause: String?
+    /// 跑者 / 陪跑员取消时附了预设原因，对方收到的取消通知带它（开放枚举，只当字符串读）。
+    let cancelReason: String?
+    /// `INTRO_CALL_PLAN_UPDATED`（发跑者）带：安排单的新版本号，第 2 版起发。
+    let planVersion: Int?
 
     init(
         type: String,
@@ -155,10 +161,16 @@ nonisolated struct WSAppNotification: Decodable, Sendable {
         priority: String?,
         timestamp: String?,
         orderId: Int64? = nil,
-        until: String? = nil
+        until: String? = nil,
+        closeCause: String? = nil,
+        cancelReason: String? = nil,
+        planVersion: Int? = nil
     ) {
         self.orderId = orderId
         self.until = until
+        self.closeCause = closeCause
+        self.cancelReason = cancelReason
+        self.planVersion = planVersion
         self.type = type
         self.eventId = eventId
         self.messageId = messageId
@@ -171,7 +183,7 @@ nonisolated struct WSAppNotification: Decodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, eventId, messageId, eventType, title, body, ttsText, priority, timestamp, orderId, until
+        case type, eventId, messageId, eventType, title, body, ttsText, priority, timestamp, orderId, until, closeCause, cancelReason, planVersion
     }
 
     init(from decoder: Decoder) throws {
@@ -188,6 +200,9 @@ nonisolated struct WSAppNotification: Decodable, Sendable {
         // `try?`：信封里这个键是附带信息，类型对不上时不该让整条通知（可能是求助）解不出来。
         orderId = (try? envelope.decodeIfPresent(Int64.self, forKey: .orderId)) ?? nil
         until = (try? envelope.decodeIfPresent(String.self, forKey: .until)) ?? nil
+        closeCause = (try? envelope.decodeIfPresent(String.self, forKey: .closeCause)) ?? nil
+        cancelReason = (try? envelope.decodeIfPresent(String.self, forKey: .cancelReason)) ?? nil
+        planVersion = (try? envelope.decodeIfPresent(Int.self, forKey: .planVersion)) ?? nil
     }
 }
 

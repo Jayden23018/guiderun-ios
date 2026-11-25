@@ -674,8 +674,9 @@ public protocol APIProtocol: Sendable {
     /// 写成 `PENDING_MATCH` 会让基准掉回 `plannedStartTime - 30min` —— 对志愿者半路取消的单
     /// 那是个过去时刻，订单会在退回后第一次候选池耗尽时直接转 `NO_VOLUNTEER`。
     ///
-    /// 两侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口 ——
-    /// 「无声拒绝」要求两侧都不归因、不透露对方表态。
+    /// 盲人侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口；
+    /// 陪跑员侧按成因发 `INTRO_CALL_CLOSED*`（信封 `closeCause`，#1051），跑者换人落在不点名的中性值上 ——
+    /// 「无声拒绝」要求不透露对方表态。
     ///
     /// 幂等：重复提交同一个表态直接返回 200，不报错（弱网重试是常态）。
     ///
@@ -2248,11 +2249,13 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//api/orders/{id}/cancel/post(cancelOrder)`.
     public func cancelOrder(
         path: Operations.cancelOrder.Input.Path,
-        headers: Operations.cancelOrder.Input.Headers = .init()
+        headers: Operations.cancelOrder.Input.Headers = .init(),
+        body: Operations.cancelOrder.Input.Body? = nil
     ) async throws -> Operations.cancelOrder.Output {
         try await cancelOrder(Operations.cancelOrder.Input(
             path: path,
-            headers: headers
+            headers: headers,
+            body: body
         ))
     }
     /// 志愿者临期确认「我还会去」（跨天预约单）
@@ -2460,8 +2463,9 @@ extension APIProtocol {
     /// 写成 `PENDING_MATCH` 会让基准掉回 `plannedStartTime - 30min` —— 对志愿者半路取消的单
     /// 那是个过去时刻，订单会在退回后第一次候选池耗尽时直接转 `NO_VOLUNTEER`。
     ///
-    /// 两侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口 ——
-    /// 「无声拒绝」要求两侧都不归因、不透露对方表态。
+    /// 盲人侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口；
+    /// 陪跑员侧按成因发 `INTRO_CALL_CLOSED*`（信封 `closeCause`，#1051），跑者换人落在不点名的中性值上 ——
+    /// 「无声拒绝」要求不透露对方表态。
     ///
     /// 幂等：重复提交同一个表态直接返回 200，不报错（弱网重试是常态）。
     ///
@@ -6575,6 +6579,44 @@ public enum Components {
                 case blockedAt
                 case maskedName
                 case userId
+            }
+        }
+        /// 取消订单的可选请求体。整个体可以不传，不传或 `reason` 为 null 时行为与此前完全一样
+        ///
+        /// - Remark: Generated from `#/components/schemas/CancelOrderRequest`.
+        public struct CancelOrderRequest: Codable, Hashable, Sendable {
+            /// 取消订单时可附的预设原因（2026-11-25 新增，#1051），可选。跑者只能用 `BLIND_` 开头的，陪跑员只能用 `VOLUNTEER_` 开头的，用错角色回 400。
+            /// 跑者：`BLIND_PLAN_CHANGED` 安排有变 / `BLIND_UNWELL` 身体不舒服 / `BLIND_WEATHER` 天气不合适 / `BLIND_ARRANGED_ELSEWHERE` 已经另外安排好了 / `BLIND_OTHER` 其他。
+            /// 陪跑员：`VOLUNTEER_SCHEDULE_CONFLICT` 时间冲突了 / `VOLUNTEER_UNWELL` 身体不舒服 / `VOLUNTEER_WEATHER` 天气不合适 / `VOLUNTEER_DELAYED` 路上耽搁，赶不过去 / `VOLUNTEER_OTHER` 其他。
+            ///
+            /// - Remark: Generated from `#/components/schemas/CancelOrderRequest/reason`.
+            @frozen public enum reasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case BLIND_PLAN_CHANGED = "BLIND_PLAN_CHANGED"
+                case BLIND_UNWELL = "BLIND_UNWELL"
+                case BLIND_WEATHER = "BLIND_WEATHER"
+                case BLIND_ARRANGED_ELSEWHERE = "BLIND_ARRANGED_ELSEWHERE"
+                case BLIND_OTHER = "BLIND_OTHER"
+                case VOLUNTEER_SCHEDULE_CONFLICT = "VOLUNTEER_SCHEDULE_CONFLICT"
+                case VOLUNTEER_UNWELL = "VOLUNTEER_UNWELL"
+                case VOLUNTEER_WEATHER = "VOLUNTEER_WEATHER"
+                case VOLUNTEER_DELAYED = "VOLUNTEER_DELAYED"
+                case VOLUNTEER_OTHER = "VOLUNTEER_OTHER"
+            }
+            /// 取消订单时可附的预设原因（2026-11-25 新增，#1051），可选。跑者只能用 `BLIND_` 开头的，陪跑员只能用 `VOLUNTEER_` 开头的，用错角色回 400。
+            /// 跑者：`BLIND_PLAN_CHANGED` 安排有变 / `BLIND_UNWELL` 身体不舒服 / `BLIND_WEATHER` 天气不合适 / `BLIND_ARRANGED_ELSEWHERE` 已经另外安排好了 / `BLIND_OTHER` 其他。
+            /// 陪跑员：`VOLUNTEER_SCHEDULE_CONFLICT` 时间冲突了 / `VOLUNTEER_UNWELL` 身体不舒服 / `VOLUNTEER_WEATHER` 天气不合适 / `VOLUNTEER_DELAYED` 路上耽搁，赶不过去 / `VOLUNTEER_OTHER` 其他。
+            ///
+            /// - Remark: Generated from `#/components/schemas/CancelOrderRequest/reason`.
+            public var reason: Components.Schemas.CancelOrderRequest.reasonPayload?
+            /// Creates a new `CancelOrderRequest`.
+            ///
+            /// - Parameters:
+            ///   - reason: 取消订单时可附的预设原因（2026-11-25 新增，#1051），可选。跑者只能用 `BLIND_` 开头的，陪跑员只能用 `VOLUNTEER_` 开头的，用错角色回 400。
+            public init(reason: Components.Schemas.CancelOrderRequest.reasonPayload? = nil) {
+                self.reason = reason
+            }
+            public enum CodingKeys: String, CodingKey {
+                case reason
             }
         }
         /// - Remark: Generated from `#/components/schemas/CancelOrderResponse`.
@@ -23421,17 +23463,26 @@ public enum Operations {
                 }
             }
             public var headers: Operations.cancelOrder.Input.Headers
+            /// - Remark: Generated from `#/paths/api/orders/{id}/cancel/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/{id}/cancel/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.CancelOrderRequest)
+            }
+            public var body: Operations.cancelOrder.Input.Body?
             /// Creates a new `Input`.
             ///
             /// - Parameters:
             ///   - path:
             ///   - headers:
+            ///   - body:
             public init(
                 path: Operations.cancelOrder.Input.Path,
-                headers: Operations.cancelOrder.Input.Headers = .init()
+                headers: Operations.cancelOrder.Input.Headers = .init(),
+                body: Operations.cancelOrder.Input.Body? = nil
             ) {
                 self.path = path
                 self.headers = headers
+                self.body = body
             }
         }
         @frozen public enum Output: Sendable, Hashable {
@@ -25068,8 +25119,9 @@ public enum Operations {
     /// 写成 `PENDING_MATCH` 会让基准掉回 `plannedStartTime - 30min` —— 对志愿者半路取消的单
     /// 那是个过去时刻，订单会在退回后第一次候选池耗尽时直接转 `NO_VOLUNTEER`。
     ///
-    /// 两侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口 ——
-    /// 「无声拒绝」要求两侧都不归因、不透露对方表态。
+    /// 盲人侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口；
+    /// 陪跑员侧按成因发 `INTRO_CALL_CLOSED*`（信封 `closeCause`，#1051），跑者换人落在不点名的中性值上 ——
+    /// 「无声拒绝」要求不透露对方表态。
     ///
     /// 幂等：重复提交同一个表态直接返回 200，不报错（弱网重试是常态）。
     ///

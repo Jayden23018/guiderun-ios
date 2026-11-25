@@ -3060,7 +3060,18 @@ public struct Client: APIProtocol {
                     in: &request.headerFields,
                     contentTypes: input.headers.accept
                 )
-                return (request, nil)
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case .none:
+                    body = nil
+                case let .json(value):
+                    body = try converter.setOptionalRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
             },
             deserializer: { response, responseBody in
                 switch response.status.code {
@@ -3863,8 +3874,9 @@ public struct Client: APIProtocol {
     /// 写成 `PENDING_MATCH` 会让基准掉回 `plannedStartTime - 30min` —— 对志愿者半路取消的单
     /// 那是个过去时刻，订单会在退回后第一次候选池耗尽时直接转 `NO_VOLUNTEER`。
     ///
-    /// 两侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口 ——
-    /// 「无声拒绝」要求两侧都不归因、不透露对方表态。
+    /// 盲人侧的结束通知仍是**同一条中性文案**（`INTRO_CALL_CONTINUE`），不因状态不同而改口；
+    /// 陪跑员侧按成因发 `INTRO_CALL_CLOSED*`（信封 `closeCause`，#1051），跑者换人落在不点名的中性值上 ——
+    /// 「无声拒绝」要求不透露对方表态。
     ///
     /// 幂等：重复提交同一个表态直接返回 200，不报错（弱网重试是常态）。
     ///

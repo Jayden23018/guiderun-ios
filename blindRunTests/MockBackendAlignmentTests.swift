@@ -83,8 +83,8 @@ final class MockBackendAlignmentTests: XCTestCase {
     /// `VolunteerService.java:314`：APPROVED 状态重传抛 `IllegalArgumentException`，
     /// 经 `GlobalExceptionHandler:136` 变成 `ApiResponse.error(400, BAD_REQUEST, message)`。
     /// 与前三条 Controller 内联 400 不同，这一条**带 errorCode**，
-    /// 因此 `localizedMessage` 走的是 `ErrorCode.badRequest` 的通用文案，
-    /// 后端那句具体说明只留在 `ErrorResponse.message` 里。
+    /// 因此 `localizedMessage` 念的是后端那句具体说明（backend#1057 起 `badRequest` 优先念 `message`，
+    /// 空时才回落「请求参数有误。」）。
     func testMockRejectsReuploadAfterApprovalLikeBackend() async {
         let client = MockAPIClient()
         let file = MultipartFile(
@@ -106,10 +106,28 @@ final class MockBackendAlignmentTests: XCTestCase {
                 return XCTFail("应当是 serverError，实际：\(error)")
             }
             XCTAssertEqual(response.message, "资质证书已审核通过，无需重新上传")
-            XCTAssertEqual(error.localizedMessage, "请求参数有误。")
+            // backend#1057：BAD_REQUEST 的 message 是写给用户的原因，要念它，不能换成固定的「请求参数有误」。
+            XCTAssertEqual(error.localizedMessage, "资质证书已审核通过，无需重新上传")
         } catch {
             XCTFail("应当抛出 APIError，实际：\(error)")
         }
+    }
+
+    func testBadRequestFallsBackToGenericCopyWhenBackendMessageIsBlank() {
+        let blank = APIError.serverError(ErrorResponse(code: "BAD_REQUEST", message: "  "))
+        XCTAssertEqual(blank.localizedMessage, "请求参数有误。")
+        let spoken = APIError.serverError(ErrorResponse(code: "BAD_REQUEST", message: "姓名需与实名认证一致，当前无法修改"))
+        XCTAssertEqual(spoken.localizedMessage, "姓名需与实名认证一致，当前无法修改")
+    }
+
+    /// backend#1010：未满 18 周岁，原样念后端那句；后端 message 空时才用本地同义句。
+    func testUnderageNotAllowedSpeaksBackendMessageVerbatim() {
+        let message = "年满 18 周岁才能使用助盲跑，您的身份证显示未满 18 周岁，暂时无法完成实名认证"
+        let error = APIError.serverError(ErrorResponse(code: "UNDERAGE_NOT_ALLOWED", message: message))
+        XCTAssertEqual(error.errorCode, .underageNotAllowed)
+        XCTAssertEqual(error.localizedMessage, message)
+        let blank = APIError.serverError(ErrorResponse(code: "UNDERAGE_NOT_ALLOWED", message: ""))
+        XCTAssertTrue(blank.localizedMessage.contains("未满 18 周岁"))
     }
 
     /// 上传成功后状态置 PENDING，且 `/api/volunteer/profile` 与状态接口保持同源。

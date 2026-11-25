@@ -345,7 +345,7 @@ struct RunnerRingOverlay: View {
 /// 🔴 **只在 WS 连着时才吞。** WS 掉线或重连中，推送是这一次唯一的通道（推送里没有 `until`，起不了完整的响铃），
 /// 吞掉它跑者拿到「正在响」而陪跑员什么都听不到。这时照常出横幅、提示音并朗读。
 ///
-/// 不比对 `recipientUserId`：这两种推送在 App 里**从不**朗读或上屏，换人登录后念给下一个人的风险不存在。
+/// `recipientUserId` 的比对在更上一层（`PushRecipientGate`，先于这里）：发给上一个账号的推送整条丢弃。
 enum VolunteerRingPush {
     static func isRingEvent(_ userInfo: [AnyHashable: Any]) -> Bool {
         (userInfo["eventType"] as? String).flatMap(RunnerRingRequest.Kind.init(eventType:))?.isForVolunteer == true

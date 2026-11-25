@@ -18,6 +18,11 @@ extension AppRealtimeCoordinator {
         "RUN_RHYTHM", "RUN_PAUSED", "RUN_RESUMED", "RUNNER_BATTERY_LOW",
         // 陪跑员请求结束（#902）：订单仍是 `IN_PROGRESS`、没有状态推送，确认按钮靠重拉后的 `finishRequestedAt` 出现。
         finishSafetyConfirmRequestedEventType,
+        // 通话磨合（backend#1055）：订单仍在 `PENDING_INTRO_CALL`（或退回前的瞬间），页面靠重拉才立刻跟上，不必等下一轮 5 秒轮询。
+        // `INTRO_CALL_PLAN_UPDATED`（跑者）：陪跑员改了安排单，此前的确认已作废，重拉后版本号变了会念「请重新收听」。
+        // `INTRO_CALL_CLOSED*`（陪跑员）：这一轮结束，页面落到「这轮没约成」。
+        "INTRO_CALL_PLAN_UPDATED", "INTRO_CALL_CLOSED", "INTRO_CALL_CLOSED_BLIND_CANCELLED",
+        "INTRO_CALL_CLOSED_TIMEOUT", "INTRO_CALL_CLOSED_TOO_SHORT",
     ]
 
     /// 陪跑员请求结束、请跑者确认安全（后端 #902）。只发给跑者。

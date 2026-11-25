@@ -93,3 +93,56 @@ final class OrderEndpointTests: XCTestCase {
         }
     }
 }
+
+/// backend#1055：取消可附预设原因、通话结束成因的解读、安排单更新的刷新。
+final class IntroCallCloseCauseAndCancelReasonTests: XCTestCase {
+    func testCancelWithoutReasonSendsNoBody() async throws {
+        let transport = RecordingTransport()
+        transport.nextResponse = CancelOrderResponse(success: true, countedAsLateCancel: false)
+        _ = try await OrderService(transport: transport).cancel(orderId: 7)
+        XCTAssertEqual(transport.requests.first?.path, "/api/orders/7/cancel")
+        XCTAssertEqual(transport.requests.first?.hasBody, false, "不附原因时与以前一样，不发请求体")
+    }
+
+    func testCancelWithReasonSendsContractValue() async throws {
+        let transport = RecordingTransport()
+        transport.nextResponse = CancelOrderResponse(success: true, countedAsLateCancel: false)
+        _ = try await OrderService(transport: transport).cancel(orderId: 7, reason: .volunteerDelayed)
+        let body = try XCTUnwrap(transport.requests.first?.body)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: String]
+        XCTAssertEqual(json, ["reason": "VOLUNTEER_DELAYED"])
+    }
+
+    func testReasonsAreSplitByRoleAndCoverAllContractValues() {
+        XCTAssertEqual(OrderCancelReason.allCases.filter(\.isForBlindRunner).count, 5)
+        XCTAssertEqual(OrderCancelReason.allCases.filter { !$0.isForBlindRunner }.count, 5)
+    }
+
+    func testUnknownCloseCauseIsNeutralRoundEnded() {
+        XCTAssertEqual(IntroCallCloseCause(rawValue: "WINDOW_TIMEOUT"), .windowTimeout)
+        XCTAssertEqual(IntroCallCloseCause(rawValue: "BLIND_CANCELLED"), .blindCancelled)
+        XCTAssertEqual(IntroCallCloseCause(rawValue: "SOMETHING_NEW"), .roundEnded)
+        XCTAssertEqual(IntroCallCloseCause(rawValue: nil), .roundEnded)
+    }
+
+    func testNotificationEnvelopeDecodesNewKeysAndToleratesTheirAbsence() throws {
+        let withKeys = Data("""
+        {"type":"APP_NOTIFICATION","eventType":"INTRO_CALL_CLOSED_BLIND_CANCELLED","body":"跑者取消了这次陪跑，原因：身体不舒服",
+         "orderId":9,"closeCause":"BLIND_CANCELLED","cancelReason":"BLIND_UNWELL","planVersion":2}
+        """.utf8)
+        let decoded = try JSONDecoder().decode(WSAppNotification.self, from: withKeys)
+        XCTAssertEqual(decoded.closeCause, "BLIND_CANCELLED")
+        XCTAssertEqual(decoded.cancelReason, "BLIND_UNWELL")
+        XCTAssertEqual(decoded.planVersion, 2)
+        let without = Data(#"{"type":"APP_NOTIFICATION","eventType":"INTRO_CALL_CLOSED","body":"这一轮通话结束了"}"#.utf8)
+        let bare = try JSONDecoder().decode(WSAppNotification.self, from: without)
+        XCTAssertNil(bare.closeCause)
+    }
+
+    func testIntroCallEventsRefreshTheOrderImmediately() {
+        for type in ["INTRO_CALL_PLAN_UPDATED", "INTRO_CALL_CLOSED", "INTRO_CALL_CLOSED_BLIND_CANCELLED",
+                     "INTRO_CALL_CLOSED_TIMEOUT", "INTRO_CALL_CLOSED_TOO_SHORT"] {
+            XCTAssertTrue(AppRealtimeCoordinator.orderRefreshingEventTypes.contains(type), type)
+        }
+    }
+}
