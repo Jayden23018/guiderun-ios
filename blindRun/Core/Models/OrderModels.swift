@@ -630,10 +630,8 @@ struct OrderDetailResponse: Codable, Identifiable, Sendable {
             // 同一条理由：漏掉会让举报入口在每次状态推送后静默消失。
             counterpartUserId: counterpartUserId,
             // 同一条理由：漏掉会让跑者的确认按钮、陪跑员的单方面结束时刻在每次状态推送后消失。
-            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, sosWindowEndsAt: sosWindowEndsAt,
             // 同一条理由：漏掉会让终态页的原因、重新匹配的提示在每次状态推送后静默消失。
-            closeReason: closeReason, closedBy: closedBy,
-            rematchedMidRun: rematchedMidRun, matchResultLatestAt: matchResultLatestAt
+            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, sosWindowEndsAt: sosWindowEndsAt, closeReason: closeReason, closedBy: closedBy, rematchedMidRun: rematchedMidRun, matchResultLatestAt: matchResultLatestAt
         )
     }
 }

@@ -254,3 +254,15 @@ extension BlindOrderTrackingDrawer {
         .accessibilityIdentifier("blindOrderFlowStatusCard")
     }
 }
+
+extension OrderDetailResponse {
+    /// 陪跑员出发后预计晚到时的一句话：「预计比约定的时间晚到约 5 分钟。」没有就是 `nil`，不显示不朗读。
+    ///
+    /// 「晚」只认后端的 `eta.late`（> 3 分钟），不自己拿 `deltaVsStartMinutes` 判（`EtaView` 注释）；
+    /// 分钟数取 `deltaVsStartMinutes`（预计到达 − 计划开跑）。后端只在 `DRIVER_EN_ROUTE` 下发 `eta`，这里仍判一次状态。
+    var blindRunnerLateSentence: String? {
+        guard status == .driverEnRoute, eta?.late == true,
+              let minutes = eta?.deltaVsStartMinutes, minutes > 0 else { return nil }
+        return "预计比约定的时间晚到约 \(minutes) 分钟。"
+    }
+}

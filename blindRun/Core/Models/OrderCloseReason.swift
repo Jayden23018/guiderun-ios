@@ -148,23 +148,29 @@ struct BlindCloseReasonCopy: Equatable {
                          nextStep: "可以重新预约，也可以换一个时间。")
         case .rematchLimitReached:
             return .init(reason: "陪跑员几次来不了，重新找人的次数用完了，预约已取消。", nextStep: rebook)
+        case .startTimeLongPassed:
+            return .init(reason: "约定的开跑时间已经过去很久，陪跑一直没有开始，系统取消了这次预约。", nextStep: rebook)
+        default:
+            return cancelledNeedingSupport(reason)
+        }
+    }
+
+    /// 已取消里需要指路联系客服的几种。拆出来是为了不让上面那个 switch 的圈复杂度超线；
+    /// 其余值（不属于已取消的）一律回 `nil`。
+    private static func cancelledNeedingSupport(_ reason: OrderCloseReason) -> BlindCloseReasonCopy? {
+        switch reason {
         case .emergencyUnresolved:
             return .init(reason: "这一单的求助还没有处理完，已过计划结束时间，系统结束了这一单。",
                          nextStep: "求助仍由客服跟进。\(contactSupport)")
         case .csCancelled:
             return .init(reason: "客服取消了这次预约。", nextStep: "有疑问的话，\(contactSupport)")
-        case .startTimeLongPassed:
-            return .init(reason: "约定的开跑时间已经过去很久，陪跑一直没有开始，系统取消了这次预约。", nextStep: rebook)
         case .systemForceClosed:
             // 不说「没跑成」：自动完成连续失败后的兜底终止，这一单实际可能已经跑完。
             return .init(reason: "系统结束了这一单。",
                          nextStep: "如果你已经跑完了，不用做什么。有疑问的话，\(contactSupport)")
         case .accountSuspended:
             return .init(reason: "你的账号已被平台停用，还没开始的预约已取消。", nextStep: "请联系客服了解详情。\(contactSupport)")
-        case .finishedBlindConfirmed, .finishedByVolunteer, .finishedByVolunteerUnconfirmed,
-             .finishedByBlindVolunteerOffline, .autoCompleted, .csCompleted,
-             .dispatchWindowExpired, .introCallWindowTooShort, .introCallFailedWindowTooShort,
-             .introCallRoundsExhausted, .unknown:
+        default:
             return nil
         }
     }
