@@ -256,8 +256,11 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
     ) {
         Task { @MainActor in
             let signedIn = self.appState?.isLoggedIn == true
-            // 跑者找陪跑员的响铃：WS 那一条已经在响，推送前台不再呈现（#1023，免得出声两遍）。
-            if signedIn, VolunteerRingPush.isRingEvent(notification.request.content.userInfo) {
+            // 跑者找陪跑员的响铃：WS 连着时那一条已经在响，推送前台不再呈现（#1023，免得出声两遍）；WS 没连着就照常呈现。
+            if signedIn, VolunteerRingPush.suppressesForeground(
+                notification.request.content.userInfo,
+                isWebSocketConnected: self.appState?.realtimeCoordinator.connectionState == .connected
+            ) {
                 completionHandler([])
                 return
             }

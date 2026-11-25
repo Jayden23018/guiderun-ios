@@ -196,6 +196,14 @@ final class VolunteerRingTests: XCTestCase {
         XCTAssertFalse(VolunteerRingPush.isRingEvent([:]))
     }
 
+    /// WS 掉线时推送是唯一通道，不能吞（否则跑者听到「正在响」而陪跑员什么都没有）。
+    func testForegroundPushIsSwallowedOnlyWhileTheSocketIsUp() {
+        let push: [AnyHashable: Any] = ["eventType": "VOLUNTEER_RING"]
+        XCTAssertTrue(VolunteerRingPush.suppressesForeground(push, isWebSocketConnected: true))
+        XCTAssertFalse(VolunteerRingPush.suppressesForeground(push, isWebSocketConnected: false))
+        XCTAssertFalse(VolunteerRingPush.suppressesForeground(["eventType": "ORDER_ACCEPTED"], isWebSocketConnected: true))
+    }
+
 }
 
 // 跑者端的按钮放在扩展里：类体到了 SwiftLint 的 250 行上限（棘轮 #488）。
