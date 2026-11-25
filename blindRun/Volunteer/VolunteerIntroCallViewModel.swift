@@ -185,28 +185,52 @@ final class VolunteerIntroCallViewModel: ObservableObject {
     /// 订单详情读得到 ⇒ 成了；仍然 403 ⇒ 这一单不是我的。
     /// 这不是取巧，是这个契约下唯一存在的判据：通话端点刻意不回对方的表态。
     private func resolveFinishedRound(orderId: Int64, appState: AppState) async {
+        // 先取订单详情，再动本地状态：这次没拿到时（网络失败、5xx、解码失败）页面要原样留着（#1010）。
+        let order: OrderDetailResponse
+        do {
+            order = try await appState.safety.matchedOrder(orderId: orderId)
+        } catch let error as APIError {
+            if error.endsSession { return }
+            // 只有服务端明说「不是参与者」才算没约成；其余只是这次没拿到，留在 `.active`，下一轮轮询再判。
+            guard Self.endsTheRound(error) else {
+                noteLoadFailure()
+                return
+            }
+            finishAsClosed(orderId: orderId)
+            return
+        } catch {
+            noteLoadFailure()
+            return
+        }
         // 过渡的前 0.3 秒要照结束前的 ③ 画，先记下来（#962 第 6 项）。
         let previousIntroCall = introCall
         let previousStep = previousIntroCall == nil ? nil : step
         introCall = nil
         incomingCallUntil = nil
-        if let order = try? await appState.safety.matchedOrder(orderId: orderId) {
-            matchedOrder = order
-            let plays = VolunteerMatchedTransition.shouldPlay(
-                previousStep: previousStep,
-                outcome: .matched,
-                watchedContinuously: isSceneActive && !backgroundedSinceLastLoad
-            )
-            matchedTransition = plays ? previousIntroCall.map { VolunteerMatchedTransition(previousIntroCall: $0) } : nil
-            outcome = .matched
-            speechService?.speak(IntroCallCopy.volunteerMatchedAnnouncement(order: order))
-            // 震动沿用状态表（`RunOrderStatus.haptic`，约好 / 临期确认都是 `.success`），不新增波形；
-            // 与上面那句播报同生同灭（`SpeechService.speakStatusChange` 的注释）。
-            order.status.haptic.map(HapticFeedback.play)
-        } else {
-            outcome = .closed
-            speechService?.speak(IntroCallCopy.volunteerRoundClosed)
-        }
+        clearLoadFailure()
+        matchedOrder = order
+        let plays = VolunteerMatchedTransition.shouldPlay(
+            previousStep: previousStep,
+            outcome: .matched,
+            watchedContinuously: isSceneActive && !backgroundedSinceLastLoad
+        )
+        matchedTransition = plays ? previousIntroCall.map { VolunteerMatchedTransition(previousIntroCall: $0) } : nil
+        outcome = .matched
+        speechService?.speak(IntroCallCopy.volunteerMatchedAnnouncement(order: order))
+        // 震动沿用状态表（`RunOrderStatus.haptic`，约好 / 临期确认都是 `.success`），不新增波形；
+        // 与上面那句播报同生同灭（`SpeechService.speakStatusChange` 的注释）。
+        order.status.haptic.map(HapticFeedback.play)
+        finishLiveActivity(orderId: orderId, bookedOrder: matchedOrder)
+        stopPolling()
+    }
+
+    /// 服务端明说这一单不是我的：本轮没约成。
+    private func finishAsClosed(orderId: Int64) {
+        introCall = nil
+        incomingCallUntil = nil
+        clearLoadFailure()
+        outcome = .closed
+        speechService?.speak(IntroCallCopy.volunteerRoundClosed)
         finishLiveActivity(orderId: orderId, bookedOrder: matchedOrder)
         stopPolling()
     }

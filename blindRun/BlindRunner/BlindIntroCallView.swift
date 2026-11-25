@@ -29,13 +29,15 @@ struct BlindIntroCallView<Footer: View>: View {
     let makeTopBar: (_ menu: [BlindOrderMenuItem], _ onRepeatStatus: @escaping () -> Void) -> BlindOrderTopBar
     /// 订单页的头部焦点。安排单刚到、陪跑员改了一版时钉回标题。
     var headerFocused: AccessibilityFocusState<Bool>.Binding
+    /// 「取消这次预约」：订单页已有的取消确认框（`showCancelConfirmation`），不另造动作。
+    let onCancelBooking: () -> Void
     @ViewBuilder let footer: () -> Footer
 
     @State private var confirmsDecline = false
 
     var body: some View {
         BlindOrderStageScaffold(
-            topBar: makeTopBar([declineMenuItem], repeatCurrentState),
+            topBar: makeTopBar(menuItems, repeatCurrentState),
             eyebrow: eyebrow,
             title: headerTitle,
             headerAccessibilityLabel: headerAccessibilityLabel,
@@ -283,6 +285,19 @@ struct BlindIntroCallView<Footer: View>: View {
     }
 
     // MARK: - 动作
+
+    private var menuItems: [BlindOrderMenuItem] {
+        BlindIntroCallMenu.kinds(for: order.status).map { kind in
+            switch kind {
+            case .cancelBooking:
+                return BlindOrderMenuItem(kind: kind, title: BlindOrderStageCopy.cancelIntroCallBooking, isDestructive: true) {
+                    onCancelBooking()
+                }
+            default:
+                return declineMenuItem
+            }
+        }
+    }
 
     private var declineMenuItem: BlindOrderMenuItem {
         BlindOrderMenuItem(kind: .changeVolunteer, title: IntroCallCopy.declineButtonTitle) {

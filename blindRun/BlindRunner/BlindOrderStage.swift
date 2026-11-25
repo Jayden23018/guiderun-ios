@@ -25,6 +25,16 @@ enum BlindOrderStage: Equatable {
     }
 }
 
+/// ②③「···」里的项（顺序即菜单顺序）。取消走订单页已有的取消确认框，不在这里另造动作。
+/// 「更换陪跑员」在前、「取消这次预约」在后：前者是中性的退出，后者是破坏性的，隔开不易误点。
+enum BlindIntroCallMenu {
+    static func kinds(for status: RunOrderStatus) -> [BlindOrderMenuItem.Kind] {
+        var kinds: [BlindOrderMenuItem.Kind] = [.changeVolunteer]
+        if status.canBlindRunnerCancel { kinds.append(.cancelBooking) }
+        return kinds
+    }
+}
+
 /// ①–④ 上的新句子。**既有的句子不在这里重写**，直接取原常量。
 enum BlindOrderStageCopy {
     static let matchingEyebrow = "匹配中"
@@ -74,6 +84,9 @@ enum BlindOrderStageCopy {
 
     static let cancelMatching = "取消匹配"
     static let cancelBooking = "取消预约"
+    /// 通话这一步（②③）的取消入口。写「这次」是为了和同一个菜单里的「更换陪跑员」分开：
+    /// 前者整单作废，后者订单继续找人、还会用掉一轮通话机会（#1010）。
+    static let cancelIntroCallBooking = "取消这次预约"
     static let runnerMessage = "给陪跑员留言"
 }
 
