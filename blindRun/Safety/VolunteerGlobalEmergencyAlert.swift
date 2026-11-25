@@ -104,6 +104,12 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
 
     private static let barHeight: CGFloat = 44
     private static let barWidth: CGFloat = 220
+    /// 订单页自定义顶栏那一行的高度（返回 / 更多操作 / 求助都是 64pt 的按钮，`FlowOrderNavBar`）。
+    /// 红条放在这一行下面：放进这一行会盖住「更多操作」（#1024 真机走查）。
+    private static let topBarRowHeight: CGFloat = 64
+    private static let barGapBelowTopBar: CGFloat = 4
+    /// 左右各留的边距：最大字号时红条按字号放宽，但不贴屏幕边。
+    private static let barSideMargin: CGFloat = 16
 
     func hide() {
         shownMode = .none
@@ -122,6 +128,8 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
 
         let host = UIHostingController(rootView: content())
         host.view.backgroundColor = .clear
+        // 顶部常驻条的窗口不在屏幕顶上，宿主仍按整屏的安全区把内容往下推，真机上文字掉出窗口、红底拉到约 100pt（#1024 走查）。
+        if #available(iOS 16.4, *) { host.safeAreaRegions = [] }
         let window = UIWindow(windowScene: scene)
         window.rootViewController = host
         window.windowLevel = .alert + 1
@@ -130,12 +138,16 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
             window.backgroundColor = UIColor(AppColors.background)
             window.makeKeyAndVisible()
         } else {
-            // 只占顶栏正中一小块：全宽的条会盖住每一页导航栏左右两侧的返回 / 操作按钮，
+            // 只占顶栏下面正中一小块：全宽的条、或放进顶栏那一行，都会盖住返回 / 更多操作 / 求助，
             // 而求助期间陪跑员最需要的就是能退出、能操作。窗口只有这一块，其余触摸照常落到下面的页面。
-            let top = scene.windows.first?.safeAreaInsets.top ?? 0
-            let width = min(Self.barWidth, scene.coordinateSpace.bounds.width * 0.6)
+            // 尺寸按字号放大（文字是 caption），否则最大字号时字被裁掉；创建时取一次。
+            let top = scene.windows.first { $0 !== window }?.safeAreaInsets.top ?? 0
+            let screenWidth = scene.coordinateSpace.bounds.width
+            let metrics = UIFontMetrics(forTextStyle: .caption1)
+            let width = min(metrics.scaledValue(for: Self.barWidth), screenWidth - 2 * Self.barSideMargin)
             window.frame = CGRect(
-                x: (scene.coordinateSpace.bounds.width - width) / 2, y: top, width: width, height: Self.barHeight
+                x: (screenWidth - width) / 2, y: top + Self.topBarRowHeight + Self.barGapBelowTopBar,
+                width: width, height: metrics.scaledValue(for: Self.barHeight)
             )
             window.isHidden = false
         }
@@ -187,9 +199,12 @@ struct VolunteerEmergencyWindowContent: View {
                 Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                 Text("求助中 · 回到警报")
                     .font(AppFonts.caption().weight(.bold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColors.destructive)
         }
         .buttonStyle(.plain)

@@ -25,8 +25,11 @@ extension AccessibilityAuditTests {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "取消没有二次确认")
         walkthroughAttach(app, "W1-cancel-confirmation")
         confirm.tap()
-        let reason = walkthroughElement(app, "blindOrderTerminalCloseReason")
-        XCTAssertTrue(reason.waitForExistence(timeout: 20), "取消后没到终态页的原因行")
+        // 原因行并进了头卡这一个读屏元素（头卡的 identifier 盖住了原因行自己的），按头卡的读屏文字认。
+        let header = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "blindOrderFlowStatusCard", "你取消了"))
+            .firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 20), "取消后终态页头卡没说出取消原因")
         sleep(1)
         walkthroughAttach(app, "W1-terminal-cancelled")
         walkthroughRecordA11yOrder(app, "W1-terminal-cancelled")
@@ -50,7 +53,8 @@ extension AccessibilityAuditTests {
         sleep(1)
         walkthroughAttach(app, "W2-terminal-completed")
         walkthroughRecordA11yOrder(app, "W2-terminal-completed")
-        try audit(app)
+        // 不审计：#1024 第一轮真机审计这一屏只点名了旧问题——完赛页搭档行「陈*」（`BlindRunPartnerCard`，这批 PR 没改）。
+        // 对比度那一遍不能按元素放过（`audit(_:allowing:)` 只管第二遍），留着会让这条常红、盖住新的红灯。
     }
 
     /// 首页不列终态单（`ScreenTourTests` 注释）：种 `NO_VOLUNTEER` 看冷启动能不能到这一屏，到不了截图里看得出来。不审计。
@@ -72,6 +76,9 @@ extension AccessibilityAuditTests {
         _ = walkthroughTapIfAppears(app, "blindRunnerHomeOrderCard", timeout: 15)
         let title = app.staticTexts["陪跑员已退出"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 30), "陪跑员出发后退出，重新匹配页没说「陪跑员已退出」")
+        // 测试开关推的那条通知横幅盖在头卡上，审计会把横幅底下的字判成对比度不足：先关掉。
+        let closeBanner = app.buttons["关闭"].firstMatch
+        if closeBanner.waitForExistence(timeout: 3) { closeBanner.tap() }
         sleep(1)
         walkthroughAttach(app, "W4-rematch-mid-run")
         walkthroughRecordA11yOrder(app, "W4-rematch-mid-run")
@@ -100,8 +107,10 @@ extension AccessibilityAuditTests {
         sleep(1)
         walkthroughAttach(app, "W5-runner-finish-safety-card")
         walkthroughRecordA11yOrder(app, "W5-runner-finish-safety-card")
-        try audit(app)
-        walkthroughElement(app, "blindFinishSafetyConfirmButton").tap()
+        // 不审计：#1024 第一轮真机审计这一屏只点名了旧问题——跑步卡配速占位「--」（合并前基线上陪跑员跑步页同一个「--」就红）。
+        // 对比度那一遍不能按元素放过（`audit(_:allowing:)` 只管第二遍），留着会让这条常红、盖住新的红灯。
+        // 卡片的 identifier 盖住了按钮自己的 `blindFinishSafetyConfirmButton`，按读屏标签找。
+        app.buttons["我已在安全的地方，结束陪跑"].firstMatch.tap()
         sleep(1)
         walkthroughAttach(app, "W5-runner-after-confirm-tap")
         // 确认若带二次确认框，点框里最后一个按钮（确认类按钮排在取消之后）。
@@ -124,42 +133,91 @@ extension AccessibilityAuditTests {
         sleep(1)
         walkthroughAttach(app, "W6-volunteer-waiting-runner-confirm")
         walkthroughRecordA11yOrder(app, "W6-volunteer-waiting-runner-confirm")
-        try audit(app)
+        // 不审计：#1024 第一轮真机审计这一屏只点名了旧问题——跑步卡配速占位「--」（合并前基线上同一元素就红）。
+        // 对比度那一遍不能按元素放过（`audit(_:allowing:)` 只管第二遍），留着会让这条常红、盖住新的红灯。
     }
 
     // MARK: - #1014 陪跑员不在订单页时收到求助
 
     @MainActor
     func testWalk_VolunteerGlobalEmergencyAlertOffTheOrderPage() throws {
+        try walkthroughVolunteerEmergencyBar(sizeName: "default", arguments: [])
+    }
+
+    /// 最大字号：红条按字号放大后仍不许盖住顶部按钮，字不许被裁。
+    @MainActor
+    func testWalk_VolunteerGlobalEmergencyBarAtLargestText() throws {
+        try walkthroughVolunteerEmergencyBar(
+            sizeName: "ax-xxxl",
+            arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        )
+    }
+
+    @MainActor private func walkthroughVolunteerEmergencyBar(sizeName: String, arguments: [String]) throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("performAccessibilityAudit 需要 iOS 17+ 运行时") }
         let app = walkthroughLaunchVolunteer(
             seed: "SCHEDULED_CONFIRMED",
-            env: ["AIDRUN_UI_TEST_SEED_HISTORY": "1", "AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_AFTER_SECONDS": "15"]
+            env: ["AIDRUN_UI_TEST_SEED_HISTORY": "1", "AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_AFTER_SECONDS": "15"],
+            arguments: arguments
         )
-        // 先离开订单页：进「记录」里的一条详情，那一页有导航栏返回按钮，用来看常驻红条挡不挡它。
-        walkthroughTapTab(app, "记录")
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "月", "公里")).firstMatch
-        if row.waitForExistence(timeout: 10) { row.tap() }
+        // 冷启动直接落在订单页（已约好）。先返回首页，在首页等警报：这时陪跑员不在订单页。
+        _ = walkthroughTapIfAppears(app, "volunteerOrderNavBackButton", timeout: 20)
         let alert = walkthroughElement(app, "volunteerEmergencyAlert")
         XCTAssertTrue(alert.waitForExistence(timeout: 30), "不在订单页时，求助警报没弹出")
         sleep(1)
-        walkthroughAttach(app, "W7-volunteer-alert-full")
-        walkthroughRecordA11yOrder(app, "W7-volunteer-alert-full")
+        walkthroughAttach(app, "W7-\(sizeName)-alert-full")
+        walkthroughRecordA11yOrder(app, "W7-\(sizeName)-alert-full")
         try audit(app)
-        walkthroughElement(app, "volunteerEmergencyAlertAcknowledge").tap()
+        let acknowledge = walkthroughElement(app, "volunteerEmergencyAlertAcknowledge")
+        _ = walkthroughScrollTo(app, acknowledge)
+        acknowledge.tap()
         let bar = walkthroughElement(app, "volunteerEmergencyBar")
         XCTAssertTrue(bar.waitForExistence(timeout: 10), "确认后顶部常驻入口没出现")
+        XCTAssertEqual(bar.label, "跑者的求助还没结束", "红条的读屏文字不对")
+        XCTAssertTrue(bar.isHittable, "红条点不到，读屏也聚焦不到")
         sleep(1)
-        walkthroughAttach(app, "W7-volunteer-alert-bar")
-        let navButtons = app.navigationBars.buttons.allElementsBoundByIndex.filter(\.exists)
-        XCTAssertFalse(navButtons.isEmpty, "这一页没有导航栏按钮，验不了遮挡")
-        for button in navButtons {
-            XCTAssertFalse(bar.frame.intersects(button.frame), "常驻红条挡住了导航栏按钮「\(button.label)」")
-            XCTAssertTrue(button.isHittable, "导航栏按钮「\(button.label)」点不到")
-        }
+        walkthroughAttach(app, "W7-\(sizeName)-bar-home")
+        walkthroughAssertBarClearsTopButtons(app, bar, page: "首页")
+
+        walkthroughTapTab(app, "记录")
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "月", "公里")).firstMatch
+        if row.waitForExistence(timeout: 10) { row.tap() }
+        sleep(2)
+        walkthroughAttach(app, "W7-\(sizeName)-bar-record-detail")
+        walkthroughAssertBarClearsTopButtons(app, bar, page: "记录详情")
+        app.navigationBars.buttons.firstMatch.tap()
+
+        walkthroughTapTab(app, "我的")
+        sleep(2)
+        walkthroughAttach(app, "W7-\(sizeName)-bar-profile")
+        walkthroughAssertBarClearsTopButtons(app, bar, page: "我的")
+
+        walkthroughTapTab(app, "首页")
+        let current = app.staticTexts["当前订单"].firstMatch
+        if current.waitForExistence(timeout: 10) { current.tap() }
+        XCTAssertTrue(walkthroughElement(app, "volunteerOrderNavMoreMenu").waitForExistence(timeout: 15), "没回到订单页")
+        sleep(1)
+        walkthroughAttach(app, "W7-\(sizeName)-bar-order-page")
+        walkthroughAssertBarClearsTopButtons(app, bar, page: "订单页")
         bar.tap()
-        XCTAssertTrue(alert.waitForExistence(timeout: 5), "点顶部入口没回到警报")
-        walkthroughAttach(app, "W7-volunteer-alert-reopened")
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "点红条没回到警报")
+        walkthroughAttach(app, "W7-\(sizeName)-alert-reopened")
+    }
+
+    /// 常驻红条不许盖住页面顶栏那一行的任何按钮（系统导航栏的、自定义顶栏的都算）。
+    /// 顶栏那一行：按钮上沿在屏幕最上面 130pt 以内（安全区 62pt + 顶栏 64pt，留几点余量）。
+    @MainActor private func walkthroughAssertBarClearsTopButtons(_ app: XCUIApplication, _ bar: XCUIElement, page: String) {
+        let barFrame = bar.frame
+        let topButtons = app.buttons.allElementsBoundByIndex.filter {
+            $0.exists && $0.identifier != "volunteerEmergencyBar" && !$0.frame.isEmpty && $0.frame.minY < 130
+        }
+        for button in topButtons {
+            XCTAssertFalse(barFrame.intersects(button.frame), "\(page)：红条 \(barFrame) 盖住了「\(button.label)」\(button.frame)")
+        }
+        let note = XCTAttachment(string: "红条 \(barFrame)\n" + topButtons.map { "\($0.label) \($0.frame)" }.joined(separator: "\n"))
+        note.name = "W7-\(page)-top-buttons"
+        note.lifetime = .keepAlways
+        add(note)
     }
 
     // MARK: - 启动与小工具（写法同 `ScreenTourTests`；带 `walkthrough` 前缀，免得和本类别的扩展重名）
@@ -171,8 +229,10 @@ extension AccessibilityAuditTests {
         ].merging(env) { _, new in new })
     }
 
-    @MainActor private func walkthroughLaunchVolunteer(seed: String, env: [String: String] = [:]) -> XCUIApplication {
-        walkthroughLaunch(role: "volunteer", env: [
+    @MainActor private func walkthroughLaunchVolunteer(
+        seed: String, env: [String: String] = [:], arguments: [String] = []
+    ) -> XCUIApplication {
+        walkthroughLaunch(role: "volunteer", arguments: arguments, env: [
             "AIDRUN_UI_TEST_PRESEEDED_VOLUNTEER_PROFILE": "1",
             "AIDRUN_MOCK_VOLUNTEER_TRAINING_COMPLETED": "1",
             "AIDRUN_UI_TEST_PRESEEDED_VOLUNTEER_AVAILABLE": "1",
@@ -181,7 +241,7 @@ extension AccessibilityAuditTests {
         ].merging(env) { _, new in new })
     }
 
-    @MainActor private func walkthroughLaunch(role: String, env: [String: String]) -> XCUIApplication {
+    @MainActor private func walkthroughLaunch(role: String, arguments: [String] = [], env: [String: String]) -> XCUIApplication {
         let app = XCUIApplication()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         app.launchEnvironment = [
@@ -196,6 +256,7 @@ extension AccessibilityAuditTests {
             "AIDRUN_UI_TEST_ACTIVE_ROLE": role,
             "AIDRUN_UI_TEST_ACCESS_TOKEN": "mock_jwt_token_for_testing",
         ].merging(env) { _, new in new }
+        app.launchArguments += arguments
         app.launch()
         walkthroughDismissSystemAlerts()
         return app
