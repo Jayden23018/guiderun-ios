@@ -19,6 +19,7 @@ extension BlindOrderStatusView {
                 order: order,
                 makeTopBar: { menu, onRepeat in stageTopBar(menu: menu + counterpartMenuItems, onRepeatStatus: onRepeat) },
                 headerFocused: $statusHeaderFocused,
+                onCancelBooking: { showCancelConfirmation = true },
                 footer: { stageFooter(order) }
             )
         } else if BlindOrderStage.resolve(order.status) == .matching {
