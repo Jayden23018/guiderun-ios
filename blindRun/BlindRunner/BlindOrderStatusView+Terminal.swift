@@ -66,6 +66,7 @@ extension BlindOrderStatusView {
                 card: { EmptyView() },
                 footer: {
                     VStack(spacing: 16) {
+                        terminalCloseReason(presentation.closeCopy)
                         terminalDisclosures(order)
                         stageFooter(order)
                     }
@@ -87,6 +88,26 @@ extension BlindOrderStatusView {
                 guard order.status == .cancelled else { return }
                 await viewModel.loadStatusLogs()
             }
+        }
+    }
+
+    /// 结束原因与下一步（#1021）。念的那份在头部的读屏标签里（`headerAccessibilityLabel`，读屏第一站就听到），
+    /// 这里只是让看得见的人也看到同样两句，所以对读屏隐藏，免得念两遍。
+    @ViewBuilder
+    private func terminalCloseReason(_ copy: BlindCloseReasonCopy?) -> some View {
+        if let copy {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(copy.reason)
+                    .flowFont(FlowFonts.rowValue())
+                    .foregroundColor(AppColors.Flow.primaryText)
+                Text(copy.nextStep)
+                    .flowFont(FlowV2Fonts.callout())
+                    .foregroundColor(AppColors.Flow.secondaryText)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("blindOrderTerminalCloseReason")
         }
     }
 

@@ -540,6 +540,18 @@ struct OrderDetailResponse: Codable, Identifiable, Sendable {
     /// 完成后跑者的求助还挂在这一单上、走云端的截止时刻。只在 `COMPLETED` 下发给本单跑者。
     @LenientOptionalString var sosWindowEndsAt: String? = nil
 
+    // 订单为什么结束、重新匹配的是哪种、最晚几点有结果（后端 #1045 / #905 / #949，iOS #1021）。一律加在末尾。
+    /// 这一单为什么结束。只在 `COMPLETED` / `CANCELLED` / `NO_VOLUNTEER` 有值；旧单与不认识的值都按「原因不详」，
+    /// 文案在 `BlindCloseReasonCopy`。陪跑员端另一张卡复用。
+    @LenientOpenEnum var closeReason: OrderCloseReason? = nil
+    /// 这一单是谁结束的。与 `closeReason` 同有同无。
+    @LenientOpenEnum var closedBy: OrderClosedBy? = nil
+    /// 当前这次重新匹配是不是陪跑员在**出发之后**退出的。只在 `REMATCHING` 且查看者是下单的跑者时有值。
+    /// 有值时它说了算，盖过 iOS 本机记录（`BlindMidRunDepartureRecord`）；`nil` 才退回本机记录。
+    @LenientOptionalBool var rematchedMidRun: Bool? = nil
+    /// 匹配中最晚这一刻会有结果（上界不是预测，会随顺延变化）。只在 `PENDING_MATCH` / `REMATCHING` 有值。
+    @LenientOptionalString var matchResultLatestAt: String? = nil
+
     var id: Int64 { orderId }
 
     func replacingStatus(with status: RunOrderStatus) -> OrderDetailResponse {
@@ -618,7 +630,8 @@ struct OrderDetailResponse: Codable, Identifiable, Sendable {
             // 同一条理由：漏掉会让举报入口在每次状态推送后静默消失。
             counterpartUserId: counterpartUserId,
             // 同一条理由：漏掉会让跑者的确认按钮、陪跑员的单方面结束时刻在每次状态推送后消失。
-            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, sosWindowEndsAt: sosWindowEndsAt
+            // 同一条理由：漏掉会让终态页的原因、重新匹配的提示在每次状态推送后静默消失。
+            finishRequestedAt: finishRequestedAt, unilateralFinishOpensAt: unilateralFinishOpensAt, sosWindowEndsAt: sosWindowEndsAt, closeReason: closeReason, closedBy: closedBy, rematchedMidRun: rematchedMidRun, matchResultLatestAt: matchResultLatestAt
         )
     }
 }

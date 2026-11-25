@@ -46,13 +46,15 @@ final class OrderStatusAndCancelTests: XCTestCase, BlindRunTestSupport {
         XCTAssertFalse(RunOrderStatus.noVolunteer.shouldPoll)
     }
 
-    func testRematchingCopyKeepsBlindRunnerInStableWaitingState() {
-        XCTAssertEqual(
-            RunOrderStatus.rematching.blindRunnerDescription,
-            "正在确认陪跑员状态，请稍候。"
-        )
-        XCTAssertEqual(RunOrderStatus.rematching.blindRunnerAnnouncement, "正在确认陪跑员状态，请稍候。")
-        XCTAssertEqual(VoiceService.statusAnnouncement(for: .rematching), "正在确认陪跑员状态，请稍候。")
+    /// 重新匹配态不再说「正在确认陪跑员状态」（#1021）：陪跑员已经来不了了，没什么可确认的。
+    /// 订单不在手里时不知道是出发前还是出发后退出，所以不下「别出门」这类指令。
+    func testRematchingCopySaysTheVolunteerCannotComeAndSomeoneElseIsBeingFound() {
+        XCTAssertEqual(RunOrderStatus.rematching.blindRunnerDescription, BlindRematchCopy.genericDescription)
+        XCTAssertEqual(RunOrderStatus.rematching.blindRunnerAnnouncement, BlindRematchCopy.genericAnnouncement)
+        XCTAssertEqual(VoiceService.statusAnnouncement(for: .rematching), BlindRematchCopy.genericAnnouncement)
+        XCTAssertTrue(BlindRematchCopy.genericAnnouncement.contains("来不了"))
+        XCTAssertTrue(BlindRematchCopy.genericAnnouncement.contains("下一位"))
+        XCTAssertFalse(BlindRematchCopy.genericAnnouncement.contains("别出门"))
     }
 
     /// `NO_VOLUNTEER` 是**终态** —— 后端派单彻底失败时订单已经是

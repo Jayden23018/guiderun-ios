@@ -202,7 +202,7 @@ extension MockAPIClient {
             throw APIError.serverError(ErrorResponse(
                 code: "END_WAIT_TOO_EARLY", message: "还没等满 15 分钟，暂时不能结束等待"))
         }
-        orders[index] = updateOrderStatus(orders[index], to: .cancelled)
+        orders[index] = updateOrderStatus(orders[index], to: .cancelled, closeReason: .blindNoShow)
         return EmptyResponse()
     }
 

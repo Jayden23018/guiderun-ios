@@ -77,7 +77,7 @@ final class BlindOrderFlowPresentationTests: XCTestCase {
     /// 而状态卡副标题同时在说「有位志愿者想陪你跑」，自相矛盾。
     func testMatchingStepDistinguishesItsThreeStatuses() {
         XCTAssertEqual(make(.pendingMatch, volunteerName: nil).title, "正在匹配陪跑员")
-        XCTAssertEqual(make(.rematching, volunteerName: nil).title, "正在重新匹配陪跑员")
+        XCTAssertEqual(make(.rematching, volunteerName: nil).title, "陪跑员来不了了")
         XCTAssertEqual(make(.pendingIntroCall, volunteerName: nil).title, "有位陪跑员想陪你跑")
     }
 

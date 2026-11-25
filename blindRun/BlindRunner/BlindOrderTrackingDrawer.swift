@@ -55,6 +55,8 @@ struct BlindOrderTrackingDrawer: View {
         switch order.status {
         case .driverEnRoute:
             var lines = [BlindTrackingDrawerCopy.enRouteSubtitle(distanceText: distanceText, place: placeName)]
+            // 陪跑员报了晚到（#1021）：和距离同在一个合成元素里，读屏一并念到。
+            if let late = order.blindRunnerLateSentence { lines.append(late) }
             if let rope = GuideRopeReminder.line(for: order, isVolunteer: false) { lines.append(rope) }
             return lines
         case .driverArrived:
@@ -250,5 +252,17 @@ extension BlindOrderTrackingDrawer {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(presentation.title)，\(beat)。\(presentation.subtitle)")
         .accessibilityIdentifier("blindOrderFlowStatusCard")
+    }
+}
+
+extension OrderDetailResponse {
+    /// 陪跑员出发后预计晚到时的一句话：「预计比约定的时间晚到约 5 分钟。」没有就是 `nil`，不显示不朗读。
+    ///
+    /// 「晚」只认后端的 `eta.late`（> 3 分钟），不自己拿 `deltaVsStartMinutes` 判（`EtaView` 注释）；
+    /// 分钟数取 `deltaVsStartMinutes`（预计到达 − 计划开跑）。后端只在 `DRIVER_EN_ROUTE` 下发 `eta`，这里仍判一次状态。
+    var blindRunnerLateSentence: String? {
+        guard status == .driverEnRoute, eta?.late == true,
+              let minutes = eta?.deltaVsStartMinutes, minutes > 0 else { return nil }
+        return "预计比约定的时间晚到约 \(minutes) 分钟。"
     }
 }

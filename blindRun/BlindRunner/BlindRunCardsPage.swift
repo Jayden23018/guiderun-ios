@@ -191,6 +191,10 @@ struct BlindRunFinishedCards: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BlindRunCardsMetrics.finishedGap) {
+            // 这一单为什么结束、接下来可以做什么（#1021）。原因不详（旧单）时不出现，页面与之前一样。
+            if let copy = order.blindCloseReasonCopy {
+                BlindCloseReasonNote(copy: copy)
+            }
             BlindRunCardsRouteMap(track: track)
             BlindRunPartnerCard(
                 feedback: feedback,
@@ -218,6 +222,28 @@ struct BlindRunFinishedCards: View {
             await feedback.load(order: order)
             await homeRunModel.refresh(appState: appState)
         }
+    }
+}
+
+/// ⑧ 已完成页顶上的两句：发生了什么、现在可以做什么。一个读屏元素，紧跟在「跑完了」那张彩色卡后面念。
+struct BlindCloseReasonNote: View {
+    let copy: BlindCloseReasonCopy
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(copy.reason)
+                .flowFont(FlowFonts.rowValue())
+                .foregroundColor(AppColors.Flow.primaryText)
+            Text(copy.nextStep)
+                .flowFont(FlowV2Fonts.callout())
+                .foregroundColor(AppColors.Flow.secondaryText)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(copy.spoken)
+        .accessibilityIdentifier("blindRunCardsCloseReason")
     }
 }
 

@@ -69,6 +69,9 @@ enum BlindOrderStageCopy {
     }
     /// 找到那一刻旧 ① 当前步的小字（稿 C 帧 0–0.3 秒）。
     static let matchFound = "刚刚找到"
+    /// ① 深色卡第二行接的一句：后端给了「最晚几点有结果」（`matchResultLatestAt`，#949）。`spoken` 是「今天下午 3 点 20 分」。
+    /// 说「最晚」：它是上界不是预测，可能更早。时刻照后端念，不自己写「开跑前半小时」。
+    static func matchResultBy(_ spoken: String) -> String { "最晚\(spoken)会有结果" }
 
     static let introCallEyebrow = "先通个电话"
     static let introCallCandidateLabel = "想陪你跑的陪跑员"
@@ -99,6 +102,34 @@ enum BlindOrderStageCopy {
     /// 前者整单作废，后者订单继续找人、还会用掉一轮通话机会（#1010）。
     static let cancelIntroCallBooking = "取消这次预约"
     static let runnerMessage = "给陪跑员留言"
+}
+
+extension OrderDetailResponse {
+    /// 「今天下午 3 点 20 分」「明天上午 9 点整」。后端没给、或解析不出时为 `nil`（不显示，不编）。
+    /// 只在匹配中两态有意义：后端只在 `PENDING_MATCH` / `REMATCHING` 下发，这里仍再判一次，防旧值带进别的状态。
+    func matchResultLatestSpoken(now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard status == .pendingMatch || status == .rematching,
+              let date = matchResultLatestAt?.nilIfBlank?.backendTimestamp else { return nil }
+        return "\(IntroCallMeetupCopy.spokenDay(date, now: now, calendar: calendar))\(BlindSpokenClock.text(date, calendar: calendar))"
+    }
+}
+
+/// 读屏念的钟点：「下午 3 点 20 分」「上午 9 点整」。不用 24 小时制：「15:20」会被念成「十五点二十」。
+enum BlindSpokenClock {
+    static func text(_ date: Date, calendar: Calendar = .current) -> String {
+        let hour = calendar.component(.hour, from: date)
+        let minute = calendar.component(.minute, from: date)
+        let period: String
+        switch hour {
+        case 0..<5: period = "凌晨"
+        case 5..<12: period = "上午"
+        case 12: period = "中午"
+        case 13..<18: period = "下午"
+        default: period = "晚上"
+        }
+        let hour12 = hour % 12 == 0 ? 12 : hour % 12
+        return minute == 0 ? "\(period) \(hour12) 点整" : "\(period) \(hour12) 点 \(minute) 分"
+    }
 }
 
 /// ①④ 底部的按钮。②③ 的按钮在 `BlindIntroCallView`（拨号、确认安排单都走通话那一套）。
@@ -196,6 +227,7 @@ struct BlindOrderStagePresentation: Equatable {
         details[.matchVolunteer] = BlindOrderStageCopy.matchingDetail(
             widening: dispatchWidened, waitedMinutes: order.blindRunnerWaitedMinutes(now: now)
         )
+        let card = matchingCard(order: order, now: now)
         var bottom: [BlindOrderStageBottomAction] = []
         // 判据与改版前同一个（`offersBlindRunnerKeepWaitingControl`）：只有 REMATCHING 是真延长。
         if order.status.offersBlindRunnerKeepWaitingControl, canKeepWaiting {
@@ -212,12 +244,24 @@ struct BlindOrderStagePresentation: Equatable {
             when: order.flexibleMatchingDescription ?? order.blindRunnerShortStartText(now: now),
             // 只有 ① 呼吸：匹配是长等待，等待指示要一直在动（稿第 3 条）。
             timeline: BlindOrderTimelineInput(position: position, details: details, currentDot: .breathing),
-            cardLead: BlindOrderStageCopy.matchingCardLead,
-            cardBody: BlindOrderStageCopy.matchingCardBody,
+            cardLead: card.lead,
+            cardBody: card.body,
             volunteer: nil,
             bottom: bottom,
             menu: []
         )
+    }
+
+    /// ① 深色卡的两行。重新匹配时说清「陪跑员来不了了、该做什么」（#1021，关 #653）；
+    /// 有「最晚几点有结果」就接在第二行后面，没有就不显示。
+    private static func matchingCard(order: OrderDetailResponse, now: Date) -> (lead: String, body: String) {
+        var card: (lead: String, body: String) = order.status == .rematching
+            ? order.blindRunnerRematchingCard
+            : (BlindOrderStageCopy.matchingCardLead, BlindOrderStageCopy.matchingCardBody)
+        if let spoken = order.matchResultLatestSpoken(now: now) {
+            card.body += "。" + BlindOrderStageCopy.matchResultBy(spoken)
+        }
+        return card
     }
 
     private static func booked(

@@ -439,7 +439,7 @@ extension RunOrderStatus {
         case .cancelled:
             return "本次预约已取消。"
         case .rematching:
-            return "正在确认陪跑员状态，请稍候。"
+            return BlindRematchCopy.genericDescription
         // 终态。这条在语音查询里跟在 `displayName`（「暂无志愿者」）后面念
         // （`VoiceStatusQuery.swift:131`），所以不再重复「没有志愿者」，直接说结果与出路。
         case .noVolunteer:
@@ -473,7 +473,7 @@ extension RunOrderStatus {
         case .cancelled:
             return "本次预约已取消。"
         case .rematching:
-            return "正在确认陪跑员状态，请稍候。"
+            return BlindRematchCopy.genericAnnouncement
         // 与 `SpeechService.statusAnnouncement` 逐字相同 —— 两者都是「状态刚变成这个」时的
         // 独立播报，语境没有区别（同 `.rematching` / `.cancelled` 等状态的既有写法）。
         case .noVolunteer:
@@ -786,10 +786,8 @@ extension OrderDetailResponse {
             }
             return "陪跑员已接单。请前往或等待在出发地点：\(startAddressForAnnouncement)。\(distanceSentence)陪跑员出发后会继续通知你。\(GuideRopeReminder.line(for: self, isVolunteer: false) ?? "")"
         case .driverEnRoute:
-            if let distanceText {
-                return "陪跑员已出发，正在前往出发地点，\(distanceText)。"
-            }
-            return "陪跑员已出发，正在前往出发地点。"
+            let distance = distanceText.map { "，\($0)" } ?? ""
+            return "陪跑员已出发，正在前往出发地点\(distance)。\(blindRunnerLateSentence ?? "")"
         case .driverArrived:
             return "\(status.blindRunnerAnnouncement)\(distanceSentence)"
         default:

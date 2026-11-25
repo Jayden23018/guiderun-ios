@@ -326,7 +326,7 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
         case .cancelled:
             return "本次预约已取消。"
         case .rematching:
-            return "正在确认陪跑员状态，请稍候。"
+            return BlindRematchCopy.genericAnnouncement
         // `NO_VOLUNTEER` 是**终态**：后端派单彻底失败时订单已经是
         // `NO_VOLUNTEER` + `cancelledBy=SYSTEM`，这一单结束了。
         // 旧文案「暂无可用志愿者，请稍后再试」把它说成还能等 —— 对看不见屏幕的人，
