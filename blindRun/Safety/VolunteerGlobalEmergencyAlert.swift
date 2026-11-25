@@ -53,6 +53,8 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
     }
 
     private func sync() {
+        // 求助结束就清掉「回看」标志：否则下一条已确认的告警会直接以整屏出现。
+        if mode == .none { presenter.isReviewing = false }
         presenter.apply(mode, content: {
             AnyView(VolunteerEmergencyWindowContent(
                 coordinator: coordinator,
@@ -99,7 +101,8 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
     private var shownMode: VolunteerEmergencyWindowMode = .none
     private var previousKeyWindow: UIWindow?
 
-    private static let barHeight: CGFloat = 48
+    private static let barHeight: CGFloat = 44
+    private static let barWidth: CGFloat = 220
 
     func hide() {
         shownMode = .none
@@ -126,8 +129,13 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
             window.backgroundColor = UIColor(AppColors.background)
             window.makeKeyAndVisible()
         } else {
+            // 只占顶栏正中一小块：全宽的条会盖住每一页导航栏左右两侧的返回 / 操作按钮，
+            // 而求助期间陪跑员最需要的就是能退出、能操作。窗口只有这一块，其余触摸照常落到下面的页面。
             let top = scene.windows.first?.safeAreaInsets.top ?? 0
-            window.frame = CGRect(x: 0, y: 0, width: scene.coordinateSpace.bounds.width, height: top + Self.barHeight)
+            let width = min(Self.barWidth, scene.coordinateSpace.bounds.width * 0.6)
+            window.frame = CGRect(
+                x: (scene.coordinateSpace.bounds.width - width) / 2, y: top, width: width, height: Self.barHeight
+            )
             window.isHidden = false
         }
         self.window = window
@@ -176,11 +184,11 @@ struct VolunteerEmergencyWindowContent: View {
         Button { presenter.isReviewing = true } label: {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
-                Text("跑者的求助还没结束 · 点此回到警报")
+                Text("求助中 · 回到警报")
                     .font(AppFonts.caption().weight(.bold))
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .background(AppColors.destructive)
         }
         .buttonStyle(.plain)
