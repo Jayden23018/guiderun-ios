@@ -118,6 +118,13 @@ extension VolunteerOrderFlowPage {
             }
             meetButtons(callFirst: meet.canEndWait)
             ringButton(meet)
+            if let quickReplies {
+                FlowQuickReplyGrid(
+                    title: "一键告诉\(quickReplies.runnerName)",
+                    items: quickReplies.items,
+                    onTap: { quickReplies.onTap($0.id) }
+                )
+            }
             if let ringNotice = meet.ringNotice {
                 Text(ringNotice)
                     .flowFont(FlowV2Fonts.subhead(bold: true))

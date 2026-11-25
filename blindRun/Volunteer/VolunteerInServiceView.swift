@@ -31,7 +31,6 @@ struct VolunteerInServiceView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var speechService: SpeechService
     @EnvironmentObject var locationService: LocationService
-    @EnvironmentObject private var amapGeocodingService: AMapGeocodingService
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) var openURL
     @StateObject var viewModel: VolunteerInServiceViewModel
@@ -274,24 +273,7 @@ struct VolunteerInServiceView: View {
                 .navigationTitle(VolunteerOrderFlowCopy.viewRunRecord)
                 .navigationBarTitleDisplayMode(.inline)
         }
-        // 屏 5：被陪同者发起求助时盖满整屏 + 警报音 + 震动。
-        //
-        // 在此之前它只是底部面板上方一条和其他提示长得一样的横幅（`emergencySection`），
-        // 而那一刻志愿者多半正看着地图导航、或者根本没在看屏幕。
-        // 那条横幅**保留**：确认之后它仍然承载求助结果文案（`AGENTS.md` §6 要求每一种结果
-        // 都可见可听），只是不再独自承担「叫住志愿者」这件事。
-        .volunteerEmergencyAlertCover(
-            coordinator: appState.emergencyCoordinator,
-            peerName: viewModel.order?.blindName,
-            peerPhone: viewModel.order?.blindPhone,
-            deviceCoordinate: locationService.currentLocation,
-            isAcknowledging: viewModel.isAcknowledgingEmergency,
-            reverseGeocode: { await amapGeocodingService.reverseGeocode(coordinate: $0)?.title },
-            serverAddress: { try? await appState.safety.orderLocationAddress(orderId: $0) },
-            onAcknowledge: { eventID in
-                Task { await viewModel.acknowledgeEmergency(eventID: eventID) }
-            }
-        )
+        // 屏 5 的全屏警报不在这里挂：它在 `VolunteerTabView` 根上（#1012），不管陪跑员在哪一页都弹。
     }
 
 }

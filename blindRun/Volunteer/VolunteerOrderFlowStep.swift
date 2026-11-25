@@ -286,12 +286,22 @@ enum VolunteerOrderFlowCopy {
             lateNotice: isLate
                 ? "离开始不到 \(lateCancelWindowHours) 小时。现在取消会记一次临时取消，系统会马上为跑者重新找人。"
                 : nil,
-            message: status == .scheduledConfirmed || status == .pendingAccept || status == .driverEnRoute
-                ? "此订单将转给其他陪跑员，之后不一定还能接回来。"
-                : "此订单将转给其他陪跑员。",
+            message: cancelMessage(for: status),
             keep: "保留这次陪跑",
             cancel: "仍然取消"
         )
+    }
+
+    /// 已到达（#1012）：跑者正在集合点等，取消的后果里要说清他会被告知。
+    static func cancelMessage(for status: RunOrderStatus?) -> String {
+        switch status {
+        case .scheduledConfirmed, .pendingAccept, .driverEnRoute:
+            return "此订单将转给其他陪跑员，之后不一定还能接回来。"
+        case .driverArrived:
+            return "此订单将转给其他陪跑员，跑者会被告知。"
+        default:
+            return "此订单将转给其他陪跑员。"
+        }
     }
 
     private static func isWithinLateCancelWindow(plannedStart: Date?, windowHours: Int, now: Date) -> Bool {
@@ -734,6 +744,8 @@ struct VolunteerOrderFlowPresentation: Equatable {
 
         var rows: [Row] = [runnerRow(order: order)]
         if let phoneRow = phoneRow(order: order) { rows.append(phoneRow) }
+
+        if let message = VolunteerRunnerMessage.row(order: order) { rows.append(message) }
 
         if order.status.disclosesBlindRunnerNotesToVolunteer {
             // 🔴 标签保留 `路线备注` / `特殊说明`，**不按设计稿合并成「引导习惯」**。
