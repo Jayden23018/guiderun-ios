@@ -83,11 +83,8 @@ extension AccessibilityAuditTests {
             banner.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: banner.frame.width - 46, dy: 48)).tap()
             sleep(2)
         }
-        XCTExpectFailure("#1028：订单页上横幅点「关闭」后不消失（ContentView 没订阅 realtimeCoordinator）", strict: false) {
-            XCTAssertFalse(banner.exists, "通知横幅关不掉")
-        }
-        // 不审计：横幅关不掉时盖在头卡上，审计只会点名横幅底下的字（#1024 两轮真机都是「关闭」「求助」「匹配中」三条）。
-        // #1028 修好后去掉上面的 XCTExpectFailure，再在这里补 `try audit(app)`。
+        XCTAssertFalse(banner.exists, "通知横幅关不掉（#1028）")
+        // 不审计：横幅移开后，头卡上的「匹配中」仍报对比度不足（#1028 真机），是这一页自己的旧问题，另记。
     }
 
     // MARK: - #1020 闸开着：陪跑员请求结束，跑者确认安全

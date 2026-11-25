@@ -226,7 +226,6 @@ final class ContentRootRouter: ObservableObject {
 /// 根路由视图，根据 AppState 的登录状态和活跃角色决定显示内容。
 /// 路由由 @Published 属性驱动，登录或角色切换后自动更新。
 struct ContentView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locationService: LocationService
     @State private var showRestorationLocalSignOutConfirmation = false
@@ -435,21 +434,8 @@ struct ContentView: View {
             MainRunLoopWatchdog.shared.setPageCategory(route.diagnosticCategory)
         }
         .modifier(SessionLifecycleStatusModifier()).modifier(DispatchProgressAnnouncer(coordinator: appState.realtimeCoordinator)) // #949
-        .overlay(alignment: .top) {
-            if let notification = appState.realtimeCoordinator.currentNotification {
-                RealtimeForegroundNotificationBanner(
-                    notification: notification,
-                    onDismiss: { appState.realtimeCoordinator.dismissCurrentNotification() }
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                // 「减弱动态效果」开启时只淡入淡出，不从屏幕顶端滑进来。
-                // 这条横幅是主动弹出的（不是用户操作触发），突然的位移最容易引起不适；
-                // 淡入保留了「有新东西出现」这个提示本身。
-                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-                .zIndex(100)
-            }
-        }
+        // 交给自己订阅协调器的子视图（#1028）：ContentView 只订阅 AppState，横幅变成「没有」时不会重画。
+        .overlay(alignment: .top) { RealtimeForegroundNotificationOverlay(coordinator: appState.realtimeCoordinator) }
         .onReceive(appState.realtimeCoordinator.$currentNotification.compactMap { $0 }) { notification in
             // @Published is a current-value publisher. Speaking mutates VoiceService,
             // which invalidates this view and recreates the subscription. Without an
