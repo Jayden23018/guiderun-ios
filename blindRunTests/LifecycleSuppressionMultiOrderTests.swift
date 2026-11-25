@@ -161,6 +161,8 @@ final class LifecycleSuppressionMultiOrderTests: XCTestCase {
         appState.realtimeCoordinator.simulateIncomingEventForTesting(.orderStatusChanged(statusEvent(
             order: 3, from: "PENDING_MATCH", to: "PENDING_ACCEPT", id: "B0000000-0000-4000-8000-000000000003"
         )))
+        // 首页经 `.receive(on: DispatchQueue.main)` 接推送，下一轮主队列才落地，不能紧跟着同步断言。
+        await waitUntil { viewModel.otherOrders.first { $0.orderId == 3 }?.status == .pendingAccept }
 
         XCTAssertEqual(viewModel.otherOrders.first { $0.orderId == 3 }?.status, .pendingAccept)
         XCTAssertEqual(viewModel.otherOrders.first { $0.orderId == 2 }?.status, .pendingMatch)
@@ -171,6 +173,7 @@ final class LifecycleSuppressionMultiOrderTests: XCTestCase {
         appState.realtimeCoordinator.simulateIncomingEventForTesting(.orderStatusChanged(statusEvent(
             order: 2, from: "PENDING_MATCH", to: "CANCELLED", id: "B0000000-0000-4000-8000-000000000002"
         )))
+        await waitUntil { viewModel.otherOrders.first { $0.orderId == 2 } == nil }
         XCTAssertNil(viewModel.otherOrders.first { $0.orderId == 2 }, "取消的预约卡要撤下")
         await waitUntil { speech.spokenHistoryForTesting.count > afterFirst }
         XCTAssertGreaterThan(speech.spokenHistoryForTesting.count, afterFirst, "第二张被取消也要念，不被去重键吞掉")
