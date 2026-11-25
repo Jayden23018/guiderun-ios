@@ -2,6 +2,9 @@ import Foundation
 
 // UI 用例演实时事件的开关。单独成文件：`blindRunApp.swift` 已超 SwiftLint 长度上限，棘轮不许它再变长。
 extension blindRunApp {
+    /// 测试开关推的那条求助的事件号。随便取的，只要和 Mock 里别的事件号不撞。
+    private static let uiTestVolunteerEmergencyEventID: Int64 = 9001
+
     func injectUITestScenariosIfNeeded() {
         injectUITestVolunteerLostIfNeeded()
         injectUITestVolunteerEmergencyIfNeeded()
@@ -17,10 +20,15 @@ extension blindRunApp {
             try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
             guard let mock = appState.sessionUnawareAPIClient as? MockAPIClient,
                   let orderId = mock.orders.first?.orderId else { return }
+            // Mock 里同时记一条未结束的事件：回前台的恢复（`refreshVolunteerAlert`）读不到它会把警报收掉。
+            mock.activeEmergencyEvent = EmergencyEventResponse(
+                id: Self.uiTestVolunteerEmergencyEventID, orderId: orderId, userId: nil,
+                status: EmergencyEventStatus.pending.rawValue, triggerType: "BUTTON", hasGpsLocation: false
+            )
             appState.realtimeCoordinator.simulateIncomingEventForTesting(
                 .emergencyAlert(WSEmergencyVolunteerAlert(
                     type: WSMessageType.emergencyVolunteerAlert.rawValue,
-                    eventId: 9001,
+                    eventId: Self.uiTestVolunteerEmergencyEventID,
                     orderId: orderId,
                     userId: nil,
                     message: "跑者发起了求助",

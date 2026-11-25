@@ -130,8 +130,6 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
 
         let host = UIHostingController(rootView: content())
         host.view.backgroundColor = .clear
-        // 顶部常驻条的窗口不在屏幕顶上，宿主仍按整屏的安全区把内容往下推，真机上文字掉出窗口、红底拉到约 100pt（#1024 走查）。
-        if #available(iOS 16.4, *) { host.safeAreaRegions = [] }
         let window = UIWindow(windowScene: scene)
         window.rootViewController = host
         window.windowLevel = .alert + 1
@@ -152,6 +150,9 @@ final class VolunteerEmergencyWindowPresenter: ObservableObject {
                 x: (screenWidth - width) / 2, y: top + topBarRow + Self.barGapBelowTopBar,
                 width: width, height: metrics.scaledValue(for: Self.barHeight)
             )
+            // 常驻条的窗口不在屏幕顶上，宿主仍按整屏的安全区把内容往下推：真机上文字掉出窗口、红底拉到约 100pt（#1024 走查）。
+            // 只对常驻条关安全区：整屏警报要照常避开状态栏与底部横条。
+            if #available(iOS 16.4, *) { host.safeAreaRegions = [] }
             window.isHidden = false
         }
         self.window = window
