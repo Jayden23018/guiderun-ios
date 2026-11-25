@@ -59,4 +59,21 @@ extension BlindRunnerHomeViewModel {
     private var statusSnapshot: [String] {
         homeOrders.map { "\($0.orderId)-\($0.status.rawValue)" }
     }
+
+    /// 跑者订单页开着、跟着这一单时，状态句以订单页为准（负责人 2026-11-08 定，`unify-order-live-tracking` design §6）：
+    /// 通话磨合没成、成单时只有订单页那句带具体内容。订单页这一次没念（`order` 还没拉回来、完成态）
+    /// 或等回话超时，首页照念。只有念不念等这个结果，`activeOrder` 在上面照常同步更新。
+    func announceRealtimeStatusUnlessOrderPageSpoke(
+        _ updated: OrderDetailResponse,
+        update: RealtimeOrderStatusUpdate
+    ) {
+        guard let tracker = appState?.realtimeCoordinator.orderLiveTracker else {
+            speechService?.speakBlindRunnerStatusChange(updated, text: updated.blindRunnerAnnouncement())
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard await tracker.pageAnnouncement(for: update, role: .blind) == .homeShouldSpeak else { return }
+            self?.speechService?.speakBlindRunnerStatusChange(updated, text: updated.blindRunnerAnnouncement())
+        }
+    }
 }
