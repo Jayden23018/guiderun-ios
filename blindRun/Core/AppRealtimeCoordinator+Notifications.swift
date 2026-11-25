@@ -62,11 +62,13 @@ extension AppRealtimeCoordinator {
         enqueue(notification, type: message.type)
     }
 
-    /// `RUNNER_RING` / `RUNNER_RING_LOST` 走响铃，不进横幅（响铃遮罩自己会念那一句，进横幅就念两遍）。
-    /// 返回 `false` = 这一条响不了（非盲人端、缺 `until`、已过点），调用方按普通通知念一次。
+    /// `RUNNER_RING` / `RUNNER_RING_LOST`（跑者端）与 `VOLUNTEER_RING` / `VOLUNTEER_RING_LOST`（陪跑员端，#1023）
+    /// 走响铃，不进横幅（响铃遮罩自己会念那一句，进横幅就念两遍）。
+    /// 返回 `false` = 这一条响不了（角色不对、缺 `until`、已过点），调用方按普通通知念一次。
     /// 同一条重复投递按 `messageId` 丢掉，复用横幅那套去重窗口。
     private func routeRunnerRing(_ message: WSAppNotification) -> Bool {
-        guard attachedRole == nil || attachedRole == .blind,
+        guard let kind = RunnerRingRequest.Kind(eventType: message.eventType),
+              attachedRole == nil || attachedRole == (kind.isForVolunteer ? .volunteer : .blind),
               let ring = RunnerRingRequest.make(from: message, receivedAt: now()) else { return false }
         guard shouldPresent(deduplicationKey: "RUNNER_RING:\(ring.id)") else { return true }
         runnerRing = ring

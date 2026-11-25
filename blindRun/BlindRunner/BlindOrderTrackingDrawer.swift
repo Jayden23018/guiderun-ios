@@ -32,6 +32,10 @@ struct BlindOrderTrackingDrawer: View {
             case .beforeRun:
                 header
                 volunteerRow
+                // ⑥「让陪跑员的手机响」（#1023）。出发中（陪跑员还在路上）后端 409，不出现。
+                if BlindRingVolunteerCopy.isAvailable(in: order.status) {
+                    BlindRingVolunteerRow(orderId: order.orderId, status: order.status)
+                }
                 if let gate = presentation.arrivalCancel, let onArrivalCancel {
                     arrivalCancelRow(gate, action: onArrivalCancel)
                 }

@@ -149,6 +149,8 @@ final class MockAPIClient: APIClientProtocol, @unchecked Sendable {
     /// 重复调返回同一条，`DELETE` 移除。
     var shareLinks: [Int64: ShareLinkResponse] = [:]
 
+    /// 每单上一次受理 `ring-volunteer` 的时刻。后端两次之间至少隔 10 秒，Mock 照做，页面上的限频提示才有处可验。
+    var lastRingVolunteerAt: [Int64: Date] = [:]
     /// 已上报的 APNs device token（幂等 upsert 的本地等价物）。
     var registeredApnsTokens: Set<String> = []
     /// `/api/notifications/since` 的补读语料。Mock 不主动产生离线通知，默认为空。

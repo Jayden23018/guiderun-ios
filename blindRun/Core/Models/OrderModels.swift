@@ -783,12 +783,12 @@ struct QuickMessageRequest: Encodable, Sendable {
     let code: QuickMessageCode
 }
 
-/// `quick-message` 与 `ring-runner` 的响应。`delivered == false` = 推送没发出去，
+/// `quick-message`、`ring-runner` 与 `ring-volunteer` 的响应。`delivered == false` = 推送没发出去，
 /// 要提示「对方可能没收到」，不能当成功播报。
 struct OrderNudgeResponse: Decodable, Sendable {
     let success: Bool?
     let orderId: Int64?
-    /// 只有 `ring-runner` 有：响到这一刻为止。之前按钮不可点。
+    /// 只有两个 ring 端点有：响到这一刻为止。之前按钮不可点。
     let ringingUntil: String?
     let delivered: Bool?
 }

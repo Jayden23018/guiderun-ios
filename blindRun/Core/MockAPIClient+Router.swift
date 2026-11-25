@@ -235,8 +235,8 @@ extension MockAPIClient {
             if path.hasSuffix("/quick-message") && method == .post {
                 return try handleQuickMessage(orderId: orderId)
             }
-            if path.hasSuffix("/ring-runner") && method == .post {
-                return try handleRingRunner(orderId: orderId)
+            if method == .post, let ring = try handleRing(path: path, orderId: orderId) {
+                return ring
             }
             if path.hasSuffix("/end-waiting") && method == .post {
                 return try handleEndWaiting(orderId: orderId)

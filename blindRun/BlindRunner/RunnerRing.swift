@@ -1,3 +1,4 @@
+import AudioToolbox
 import AVFoundation
 import Combine
 import OSLog
@@ -27,20 +28,63 @@ enum RunnerRingCopy {
     static let stopTitle = "停止响铃"
     static let accessibilityHint = "双击屏幕任意位置停止响铃"
 
+    // 反方向（#1023）：跑者让陪跑员的手机响。两句话不能混用：跑步中说「在出发点」是错的。
+    static let seekingFallbackSpeech = "跑者在找你，请出声回应"
+    static let seekingTitle = "跑者在找你"
+    static let seekingDetail = "手机正在响。请出声回应，让跑者循着声音找到你。"
+    static let seekingAccessibilityLabel = "跑者在找你，请出声回应。手机正在响。知道了，停止响铃"
+
+    static let runnerLostFallbackSpeech = "跑者找不到你，请原地出声回应"
+    static let runnerLostTitle = "跑者找不到你"
+    static let runnerLostDetail = "手机正在响。请原地出声回应，不要走开，让跑者找到你。"
+    static let runnerLostAccessibilityLabel = "跑者找不到你，请原地出声回应。手机正在响。知道了，停止响铃"
+
+    static let volunteerStopTitle = "知道了"
+    static let volunteerAccessibilityHint = "双击屏幕任意位置，知道了并停止响铃"
+
     static func fallbackSpeech(_ kind: RunnerRingRequest.Kind) -> String {
-        kind == .lost ? lostFallbackSpeech : fallbackSpeech
+        switch kind {
+        case .arrived: return fallbackSpeech
+        case .lost: return lostFallbackSpeech
+        case .runnerSeeking: return seekingFallbackSpeech
+        case .runnerLost: return runnerLostFallbackSpeech
+        }
     }
 
     static func title(_ kind: RunnerRingRequest.Kind) -> String {
-        kind == .lost ? lostTitle : title
+        switch kind {
+        case .arrived: return title
+        case .lost: return lostTitle
+        case .runnerSeeking: return seekingTitle
+        case .runnerLost: return runnerLostTitle
+        }
     }
 
     static func detail(_ kind: RunnerRingRequest.Kind) -> String {
-        kind == .lost ? lostDetail : detail
+        switch kind {
+        case .arrived: return detail
+        case .lost: return lostDetail
+        case .runnerSeeking: return seekingDetail
+        case .runnerLost: return runnerLostDetail
+        }
     }
 
     static func accessibilityLabel(_ kind: RunnerRingRequest.Kind) -> String {
-        kind == .lost ? lostAccessibilityLabel : accessibilityLabel
+        switch kind {
+        case .arrived: return accessibilityLabel
+        case .lost: return lostAccessibilityLabel
+        case .runnerSeeking: return seekingAccessibilityLabel
+        case .runnerLost: return runnerLostAccessibilityLabel
+        }
+    }
+
+    /// 停止按钮的字。跑者端是「停止响铃」，陪跑员端按设计是「知道了」。
+    static func stopTitle(_ kind: RunnerRingRequest.Kind) -> String {
+        kind.isForVolunteer ? volunteerStopTitle : stopTitle
+    }
+
+    static func accessibilityHint(_ kind: RunnerRingRequest.Kind) -> String {
+        kind.isForVolunteer ? volunteerAccessibilityHint : accessibilityHint
     }
 }
 
@@ -52,15 +96,24 @@ struct RunnerRingRequest: Equatable, Sendable {
         case arrived
         /// 陪跑中走散，`RUNNER_RING_LOST`。
         case lost
+        /// 反方向，陪跑员端：汇合期跑者在找你，`VOLUNTEER_RING`（#1023）。
+        case runnerSeeking
+        /// 反方向，陪跑员端：陪跑中跑者找不到你，`VOLUNTEER_RING_LOST`。
+        case runnerLost
 
         /// `nil` = 不是响铃事件。
         init?(eventType: String) {
             switch eventType.uppercased() {
             case "RUNNER_RING": self = .arrived
             case "RUNNER_RING_LOST": self = .lost
+            case "VOLUNTEER_RING": self = .runnerSeeking
+            case "VOLUNTEER_RING_LOST": self = .runnerLost
             default: return nil
             }
         }
+
+        /// 响的是陪跑员的手机。协调器按它分角色：陪跑员端只收这两种，跑者端只收另两种。
+        var isForVolunteer: Bool { self == .runnerSeeking || self == .runnerLost }
     }
 
     let id: String
@@ -163,11 +216,15 @@ final class RunnerRingController: ObservableObject {
 
     /// 先念后响的等待上限。同时起的话铃声会盖住那句「你的陪跑员到了」。
     static let speechWaitLimit: TimeInterval = 4
+    /// 陪跑员端两次震动的间隔，与提示音「1 秒一循环」同拍。
+    static let vibrationInterval: TimeInterval = 1
 
     var speak: (String) -> Void = { _ in }
     var isSpeaking: () -> Bool = { false }
     var startTone: () -> Void = { RunnerRingTone.start() }
     var stopTone: () -> Void = { RunnerRingTone.stop() }
+    /// 陪跑员端（`Kind.isForVolunteer`）响铃时每秒震一下，跑者端不震（现有行为不动）。
+    var vibrate: () -> Void = { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
     /// 响完或被按停之后。用来清掉协调器上那一条，免得重新订阅时回放。
     var onFinish: () -> Void = {}
 
@@ -206,8 +263,17 @@ final class RunnerRingController: ObservableObject {
         let remaining = ring.endsAt.timeIntervalSince(now())
         if remaining > 0 {
             startTone()
-            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
-            if Task.isCancelled { return }
+            if ring.kind.isForVolunteer {
+                while now() < ring.endsAt {
+                    vibrate()
+                    let step = min(Self.vibrationInterval, ring.endsAt.timeIntervalSince(now()))
+                    try? await Task.sleep(nanoseconds: UInt64(max(step, 0) * 1_000_000_000))
+                    if Task.isCancelled { return }
+                }
+            } else {
+                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+                if Task.isCancelled { return }
+            }
         }
         finish()
     }
@@ -247,7 +313,7 @@ struct RunnerRingOverlay: View {
                     .foregroundColor(AppColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                PrimaryButton(RunnerRingCopy.stopTitle, action: onStop)
+                PrimaryButton(RunnerRingCopy.stopTitle(kind), action: onStop)
             }
             .readableContentColumn()
             .padding(24)
@@ -260,12 +326,25 @@ struct RunnerRingOverlay: View {
         // 整屏一个元素：读屏焦点落在哪都能双击停。
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(RunnerRingCopy.accessibilityLabel(kind))
-        .accessibilityHint(RunnerRingCopy.accessibilityHint)
+        .accessibilityHint(RunnerRingCopy.accessibilityHint(kind))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, onStop)
         .accessibilityAction(.magicTap, onStop)
         .accessibilityAction(.escape, onStop)
         .accessibilityIdentifier("runnerRingOverlay")
         .onAppear { UIAccessibility.post(notification: .screenChanged, argument: nil) }
+    }
+}
+
+// MARK: - 推送与 WebSocket 不响两遍
+
+/// `VOLUNTEER_RING` / `VOLUNTEER_RING_LOST` 每次都同时发 WS 和 APNs（后端 #1046）。App 在前台时 WS 那一条已经出声、
+/// 震动、念了一句，推送再出横幅、提示音、朗读就是第二遍，所以前台一律不呈现推送；点开推送（响铃多半早过点了）也不补念。
+/// App 在后台时系统自己出横幅和提示音（`time-sensitive`），不经过这里。
+///
+/// 不比对 `recipientUserId`：这两种推送在 App 里**从不**朗读或上屏，换人登录后念给下一个人的风险不存在。
+enum VolunteerRingPush {
+    static func isRingEvent(_ userInfo: [AnyHashable: Any]) -> Bool {
+        (userInfo["eventType"] as? String).flatMap(RunnerRingRequest.Kind.init(eventType:))?.isForVolunteer == true
     }
 }

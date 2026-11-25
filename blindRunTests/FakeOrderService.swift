@@ -347,3 +347,12 @@ extension FakeOrderService {
         return try confirmSafeResult.get()
     }
 }
+
+// 放在扩展里：类体已到 SwiftLint 的 250 行上限。「让陪跑员的手机响」的结果在视图模型那一层注入
+// （`BlindRingVolunteerViewModel.ring(send:)`），这里只满足协议。
+extension FakeOrderService {
+    func ringVolunteer(orderId: Int64) async throws -> OrderNudgeResponse {
+        record()
+        throw NotStubbed(method: "ringVolunteer")
+    }
+}
