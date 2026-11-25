@@ -438,8 +438,10 @@ extension RunOrderStatus {
             return "陪跑已完成，感谢使用助盲跑。"
         case .cancelled:
             return "本次预约已取消。"
+        // 不知道陪跑员是出发前还是出发后退出的，所以只说「来不了了、在找下一位」，不下「别出门」这种指令；
+        // 订单在手时走 `OrderDetailResponse.blindRunnerDescriptionUnlessLeftAlone` 说得更具体（#1021）。
         case .rematching:
-            return "正在确认陪跑员状态，请稍候。"
+            return BlindRematchCopy.genericDescription
         // 终态。这条在语音查询里跟在 `displayName`（「暂无志愿者」）后面念
         // （`VoiceStatusQuery.swift:131`），所以不再重复「没有志愿者」，直接说结果与出路。
         case .noVolunteer:
@@ -473,7 +475,7 @@ extension RunOrderStatus {
         case .cancelled:
             return "本次预约已取消。"
         case .rematching:
-            return "正在确认陪跑员状态，请稍候。"
+            return BlindRematchCopy.genericAnnouncement
         // 与 `SpeechService.statusAnnouncement` 逐字相同 —— 两者都是「状态刚变成这个」时的
         // 独立播报，语境没有区别（同 `.rematching` / `.cancelled` 等状态的既有写法）。
         case .noVolunteer:
@@ -767,6 +769,16 @@ extension OrderDetailResponse {
     ///
     /// 只在 `IN_PROGRESS` 加。派单期、汇合期念它没有用：那时还没开始跑，
     /// 而每多一句都是读屏用户在主路径上多等的时间。约好那两态末尾接带绳提醒（#660 V-8，`GuideRopeReminder`）。
+    /// 陪跑员出发后预计晚到时的一句话：「预计比约定的时间晚到约 5 分钟。」没有就是 `nil`，不显示不朗读。
+    ///
+    /// 「晚」只认后端的 `eta.late`（> 3 分钟），不自己拿 `deltaVsStartMinutes` 判（`EtaView` 注释）；
+    /// 分钟数取 `deltaVsStartMinutes`（预计到达 − 计划开跑）。后端只在 `DRIVER_EN_ROUTE` 下发 `eta`，这里仍判一次状态。
+    var blindRunnerLateSentence: String? {
+        guard status == .driverEnRoute, eta?.late == true,
+              let minutes = eta?.deltaVsStartMinutes, minutes > 0 else { return nil }
+        return "预计比约定的时间晚到约 \(minutes) 分钟。"
+    }
+
     func blindRunnerAnnouncement(distanceText: String? = nil) -> String {
         let distanceSentence = distanceText.map { "陪跑员\($0)。" } ?? ""
         switch status {
@@ -786,10 +798,11 @@ extension OrderDetailResponse {
             }
             return "陪跑员已接单。请前往或等待在出发地点：\(startAddressForAnnouncement)。\(distanceSentence)陪跑员出发后会继续通知你。\(GuideRopeReminder.line(for: self, isVolunteer: false) ?? "")"
         case .driverEnRoute:
+            let late = blindRunnerLateSentence ?? ""
             if let distanceText {
-                return "陪跑员已出发，正在前往出发地点，\(distanceText)。"
+                return "陪跑员已出发，正在前往出发地点，\(distanceText)。\(late)"
             }
-            return "陪跑员已出发，正在前往出发地点。"
+            return "陪跑员已出发，正在前往出发地点。\(late)"
         case .driverArrived:
             return "\(status.blindRunnerAnnouncement)\(distanceSentence)"
         default:

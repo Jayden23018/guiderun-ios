@@ -143,7 +143,7 @@ final class BlindMidRunDepartureTests: XCTestCase {
         let presentation = try XCTUnwrap(
             BlindOrderFlowPresentation.make(order: order, distanceText: nil, canKeepWaiting: false)
         )
-        XCTAssertEqual(presentation.title, "正在重新匹配陪跑员")
+        XCTAssertEqual(presentation.title, BlindRematchCopy.title)
         XCTAssertEqual(order.blindRunnerAnnouncement(), RunOrderStatus.rematching.blindRunnerAnnouncement)
     }
 }

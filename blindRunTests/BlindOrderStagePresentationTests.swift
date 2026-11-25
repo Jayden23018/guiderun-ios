@@ -45,7 +45,7 @@ final class BlindOrderStagePresentationTests: XCTestCase, BlindRunTestSupport {
         XCTAssertEqual(used.bottom, [.cancelMatching])
     }
 
-    /// 「最晚开跑前半小时会有结果」等 backend#949，合之前任何状态都不许出现。
+    /// 「最晚几点有结果」只念后端给的时刻（#1021），不自己写死「开跑前半小时」：这里的订单没有该字段，任何状态都不许出现。
     func testDeadlineLineWaitingForTheBackendNeverAppears() throws {
         for status in [RunOrderStatus.pendingMatch, .rematching, .scheduledConfirmed, .pendingAccept] {
             let page = try XCTUnwrap(BlindOrderStagePresentation.make(order: makeOrder(orderId: 1, status: status), canKeepWaiting: true))

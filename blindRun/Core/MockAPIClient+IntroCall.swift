@@ -459,7 +459,7 @@ extension MockAPIClient {
                     code: "BLIND_CANCEL_TOO_EARLY",
                     message: "陪跑员刚到不久，请先打电话联系对方；若一直没碰上，\(clock)之后可以取消"))
             }
-            orders[index] = updateOrderStatus(orders[index], to: .cancelled)
+            orders[index] = updateOrderStatus(orders[index], to: .cancelled, closeReason: .blindCancelledAfterArrival)
             return CancelOrderResponse(success: true, countedAsLateCancel: false)
         }
         guard let role = mockRole, orders[index].status.canCancel(as: role) else {

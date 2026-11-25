@@ -55,6 +55,8 @@ struct BlindOrderTrackingDrawer: View {
         switch order.status {
         case .driverEnRoute:
             var lines = [BlindTrackingDrawerCopy.enRouteSubtitle(distanceText: distanceText, place: placeName)]
+            // 陪跑员报了晚到（#1021）：和距离同在一个合成元素里，读屏一并念到。
+            if let late = order.blindRunnerLateSentence { lines.append(late) }
             if let rope = GuideRopeReminder.line(for: order, isVolunteer: false) { lines.append(rope) }
             return lines
         case .driverArrived:

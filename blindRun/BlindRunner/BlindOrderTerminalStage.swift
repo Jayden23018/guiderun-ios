@@ -4,6 +4,8 @@ import Foundation
 //
 // 与 ①–④ 同一个外壳（深色头 + 白色抽屉 + 竖线），竖线停在中断那一步，后面的步不画。
 // 负责人 11-11 去掉了说明卡（原话「这种没必要的说明把它给去掉」），所以这里没有卡片内容。
+// #1021 起，后端给了结束原因（`closeReason`）就在竖线上方补两句：发生了什么、现在可以做什么。
+// 它不是回到说明卡，而是订单为什么结束、接下来怎么办这两件盲人原来只能在一次性横幅里听到的事；原因不详时页面与之前一样。
 
 enum BlindOrderTerminalCopy {
     static let backHome = "返回首页"
@@ -40,11 +42,14 @@ struct BlindOrderTerminalPresentation: Equatable {
     let title: String
     let place: String?
     let when: String?
+    /// 结束原因与下一步（#1021）。`nil` = 原因不详（旧单、不认识的值），页面照旧。
+    let closeCopy: BlindCloseReasonCopy?
     /// `nil` = 还不知道停在哪一步（已取消但状态变更记录没拿到），不画竖线，不猜。
     let timeline: BlindOrderTimelineInput?
 
+    /// 读屏先读到的那一段：状态、标题，紧接着原因和下一步（它们都在头部这一个元素里，不用再往下找）。
     var headerAccessibilityLabel: String {
-        "\(eyebrow)。\(title)"
+        ["\(eyebrow)。\(title)", closeCopy?.spoken].compactMap { $0 }.joined(separator: "。")
     }
 
     /// `nil` = 这一态不走终态页。
@@ -72,6 +77,7 @@ struct BlindOrderTerminalPresentation: Equatable {
             title: title,
             place: BlindOrderStagePresentation.placeLine(order: order, includesMeetSpot: true),
             when: start,
+            closeCopy: order.blindCloseReasonCopy,
             timeline: timeline
         )
     }

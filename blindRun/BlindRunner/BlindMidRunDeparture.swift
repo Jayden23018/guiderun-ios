@@ -10,6 +10,25 @@ enum BlindMidRunDepartureCopy {
     static let title = "陪跑员已退出"
     static let description = "现在只有你一个人。请先停下来，走到安全的地方等候。系统正在重新匹配陪跑员。"
     static let announcement = "\(title)。\(description)"
+    /// ① 页深色卡的两行，与上面的语音同一个意思（#1021：页面与语音一致）。
+    static let cardLead = "先停下来，走到安全的地方"
+    static let cardBody = "系统正在找下一位陪跑员，找到后马上通知你"
+}
+
+/// 陪跑员**出发前**退出（`rematchedMidRun == false`）后，跑者这一侧说什么（#1021，关掉 #653 的卡片那半）。
+/// 说清三件事：陪跑员来不了了、系统在找下一位、现在先别出门。不说原因：可能是他取消，也可能是系统判他联系不上。
+enum BlindRematchCopy {
+    static let title = "陪跑员来不了了"
+    static let description = "先别出门。系统正在找下一位陪跑员，找到后马上通知你。"
+    static let announcement = "\(title)。\(description)"
+    static let cardLead = "先别出门"
+    static let cardBody = "系统正在找下一位陪跑员，找到后马上通知你"
+    /// 手机不知道陪跑员是出发前还是出发后退出的（老后端没给 `rematchedMidRun`、本机也没记录）：
+    /// 不下「别出门」这种可能不对的指令，只说前两件事。
+    static let genericDescription = "系统正在找下一位陪跑员，找到后马上通知你。"
+    static let genericAnnouncement = "\(title)。\(genericDescription)"
+    static let genericCardLead = "系统正在找下一位陪跑员"
+    static let genericCardBody = "找到后马上通知你"
 }
 
 /// 这台手机上，最近一张进过同行三态的订单。
@@ -97,28 +116,64 @@ final class BlindMidRunDepartureRecord {
 
 extension OrderDetailResponse {
     /// 这一单正在重新匹配，而且陪跑员是在同行三态里退出的。
+    ///
+    /// 后端给了 `rematchedMidRun`（#905）就以它为准；没给（老后端）才退回本机记录。
     var blindRunnerLeftAloneMidRun: Bool {
-        BlindMidRunDepartureRecord.shared.volunteerLeftMidRun(orderID: orderId, status: status)
+        guard status == .rematching else { return false }
+        if let rematchedMidRun { return rematchedMidRun }
+        return BlindMidRunDepartureRecord.shared.volunteerLeftMidRun(orderID: orderId, status: status)
+    }
+
+    /// 重新匹配态的三种说法。其余状态恒为 `nil`。
+    enum RematchKind: Equatable {
+        case leftAloneMidRun
+        case beforeSettingOut
+        case unknownWhen
+    }
+
+    var rematchKind: RematchKind? {
+        guard status == .rematching else { return nil }
+        if blindRunnerLeftAloneMidRun { return .leftAloneMidRun }
+        return rematchedMidRun == false ? .beforeSettingOut : .unknownWhen
     }
 
     // 以下几条是跑者各处文案的唯一分支点（#653）：状态变化、「重复当前状态」都走 `blindRunnerAnnouncement`。
 
     var blindRunnerAnnouncementUnlessLeftAlone: String {
-        blindRunnerLeftAloneMidRun ? BlindMidRunDepartureCopy.announcement : status.blindRunnerAnnouncement
+        switch rematchKind {
+        case .leftAloneMidRun: return BlindMidRunDepartureCopy.announcement
+        case .beforeSettingOut: return BlindRematchCopy.announcement
+        case .unknownWhen: return BlindRematchCopy.genericAnnouncement
+        case nil: return status.blindRunnerAnnouncement
+        }
     }
 
     var blindRunnerDescriptionUnlessLeftAlone: String {
-        blindRunnerLeftAloneMidRun ? BlindMidRunDepartureCopy.description : status.blindRunnerDescription
+        switch rematchKind {
+        case .leftAloneMidRun: return BlindMidRunDepartureCopy.description
+        case .beforeSettingOut: return BlindRematchCopy.description
+        case .unknownWhen: return BlindRematchCopy.genericDescription
+        case nil: return status.blindRunnerDescription
+        }
     }
 
     var blindRunnerRematchingTitle: String {
-        blindRunnerLeftAloneMidRun ? BlindMidRunDepartureCopy.title : "正在重新匹配陪跑员"
+        blindRunnerLeftAloneMidRun ? BlindMidRunDepartureCopy.title : BlindRematchCopy.title
+    }
+
+    /// ① 页深色卡的两行（重新匹配态）。
+    var blindRunnerRematchingCard: (lead: String, body: String) {
+        switch rematchKind {
+        case .leftAloneMidRun: return (BlindMidRunDepartureCopy.cardLead, BlindMidRunDepartureCopy.cardBody)
+        case .beforeSettingOut: return (BlindRematchCopy.cardLead, BlindRematchCopy.cardBody)
+        case .unknownWhen, nil: return (BlindRematchCopy.genericCardLead, BlindRematchCopy.genericCardBody)
+        }
     }
 
     /// 语音问「现在什么状态」的答句。
     var blindRunnerStatusAnswer: String {
-        blindRunnerLeftAloneMidRun
-            ? BlindMidRunDepartureCopy.announcement
+        status == .rematching
+            ? blindRunnerAnnouncementUnlessLeftAlone
             : "\(status.displayName)。\(status.blindRunnerDescription)"
     }
 }

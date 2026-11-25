@@ -20,8 +20,11 @@ extension MockAPIClient {
         _ order: OrderDetailResponse,
         to newStatus: RunOrderStatus,
         volunteerPhone: String? = nil,
-        meetupPlan: IntroCallPlanView? = nil
+        meetupPlan: IntroCallPlanView? = nil,
+        closeReason: OrderCloseReason? = nil
     ) -> OrderDetailResponse {
+        // 与后端一致（#1045）：只在终态有值，两个字段同有同无；其余状态为 null。没指定时按状态给最常见的那个。
+        let reason = closeReason ?? Self.mockDefaultCloseReason(for: newStatus)
         appendStatusLog(
             orderId: order.orderId,
             from: order.status,
@@ -66,8 +69,39 @@ extension MockAPIClient {
             meetSpotNote: meetupPlan?.meetSpotNote ?? order.meetSpotNote,
             runnerTopColor: meetupPlan?.runnerTopColor ?? order.runnerTopColor,
             volunteerTopColor: newStatus == .rematching ? nil : (meetupPlan?.volunteerTopColor ?? order.volunteerTopColor),
-            counterpartUserId: hasAcceptedVolunteer ? Self.mockOrderVolunteerId : nil
+            counterpartUserId: hasAcceptedVolunteer ? Self.mockOrderVolunteerId : nil,
+            closeReason: reason,
+            closedBy: reason.map(Self.mockClosedBy(for:)),
+            // 后端口径（#905）：只在 `REMATCHING` 有值；陪跑员在出发后退出才是 true。
+            rematchedMidRun: newStatus == .rematching ? order.status.runsLiveEscortSession : nil
         )
+    }
+
+    private static func mockDefaultCloseReason(for status: RunOrderStatus) -> OrderCloseReason? {
+        switch status {
+        case .completed: return .finishedBlindConfirmed
+        case .cancelled: return .blindCancelled
+        case .noVolunteer: return .dispatchWindowExpired
+        case .pendingMatch, .pendingIntroCall, .scheduledConfirmed, .pendingAccept, .inProgress,
+             .driverEnRoute, .driverArrived, .rematching, .unknown:
+            return nil
+        }
+    }
+
+    /// 与后端 #1047 表里「closedBy」一列一致。
+    static func mockClosedBy(for reason: OrderCloseReason) -> OrderClosedBy {
+        switch reason {
+        case .finishedBlindConfirmed, .finishedByVolunteer, .finishedByVolunteerUnconfirmed, .blindNoShow:
+            return .volunteer
+        case .finishedByBlindVolunteerOffline, .blindCancelled, .blindCancelledAfterArrival:
+            return .blind
+        case .csCompleted, .csCancelled, .accountSuspended:
+            return .cs
+        case .autoCompleted, .matchTimeout, .rematchLimitReached, .emergencyUnresolved, .startTimeLongPassed,
+             .systemForceClosed, .dispatchWindowExpired, .introCallWindowTooShort,
+             .introCallFailedWindowTooShort, .introCallRoundsExhausted, .unknown:
+            return .system
+        }
     }
 
     /// Mock 的 remark 逐字抄后端那 12 处 `logStatusChange` 的第五个参数，
