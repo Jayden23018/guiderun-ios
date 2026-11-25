@@ -79,6 +79,10 @@ extension MockAPIClient {
         let isPastMatching = activeOrderStatus.offersVolunteerCall
         let startedAt = Calendar.current.date(byAdding: .minute, value: -20, to: Date())!
         let startedEnd = Calendar.current.date(byAdding: .minute, value: 40, to: Date())!
+        // 「已约好、还没到点」只在这一个开关下出现：首页「加入日历」只给开始时间在未来的单（#660 B-18），
+        // 而上面的规则会把有人接下的单一律挪到 20 分钟前。
+        let startsInFuture = !isPastMatching
+            || ProcessInfo.processInfo.environment["AIDRUN_UI_TEST_SEED_FUTURE_START"] == "1"
 
         orders = [
             OrderDetailResponse(
@@ -93,8 +97,8 @@ extension MockAPIClient {
                 endAddress: nil,
                 endLatitude: nil,
                 endLongitude: nil,
-                plannedStart: formatter.string(from: isPastMatching ? startedAt : futureDate),
-                plannedEnd: formatter.string(from: isPastMatching ? startedEnd : futureEnd),
+                plannedStart: formatter.string(from: startsInFuture ? futureDate : startedAt),
+                plannedEnd: formatter.string(from: startsInFuture ? futureEnd : startedEnd),
                 blindName: "李明",
                 blindPhone: "13800001001",
                 volunteerPhone: isPastMatching ? "13800000002" : nil,

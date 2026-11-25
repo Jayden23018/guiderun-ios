@@ -1248,7 +1248,7 @@ final class AccessibilityAuditTests: XCTestCase {
         app.descendants(matching: .any)["volunteerOrderNavMoreMenu"].firstMatch.tap()
         XCTAssertTrue(app.buttons["volunteerIntroCallDeclineButton"].waitForExistence(timeout: 5), "V3「···」里没有「不合适」")
         XCTAssertFalse(app.buttons["volunteerIntroCallUnreachableButton"].exists, "提交过安排单 = 电话打通了，不再给「未接到来电」")
-        header.tap() // 点菜单外收起
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).tap() // 点菜单外收起
 
         // 修改前先提示需跑者重新确认。
         edit.tap()

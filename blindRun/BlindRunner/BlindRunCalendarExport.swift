@@ -62,6 +62,8 @@ struct BlindRunCalendarButton: View {
 
     /// 盲人端整行可点的下限。
     private static let minRowHeight: CGFloat = 64
+    /// 小日历边长，随系统字号放大（真机无障碍审计 2026-11-25 指出固定字号不跟 Dynamic Type）。
+    @ScaledMetric(relativeTo: .headline) private var iconSide: CGFloat = 40
 
     var body: some View {
         if #available(iOS 17, *), BlindRunCalendarExport.canExport(order) {
@@ -93,7 +95,7 @@ struct BlindRunCalendarButton: View {
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColors.Flow.secondaryText)
         }
         .padding(.horizontal, 18)
@@ -109,19 +111,19 @@ struct BlindRunCalendarButton: View {
             let parts = Calendar.current.dateComponents([.month, .day], from: start)
             VStack(spacing: 0) {
                 Text("\(parts.month ?? 0)月")
-                    .font(.system(size: 11, weight: .bold))
+                    .flowFont(FlowV2Fonts.tag())
                     .foregroundColor(AppColors.destructive)
                 Text("\(parts.day ?? 0)")
-                    .font(.system(size: 17, weight: .bold))
+                    .flowFont((17, .bold, .headline))
                     .foregroundColor(AppColors.Flow.primaryText)
             }
-            .frame(width: 40, height: 40)
+            .frame(minWidth: iconSide, minHeight: iconSide)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(AppColors.Flow.surfaceSubtle))
             .accessibilityHidden(true)
         } else {
             Image(systemName: "calendar")
-                .font(.system(size: 22))
-                .frame(width: 40, height: 40)
+                .font(.title2)
+                .frame(width: iconSide, height: iconSide)
                 .accessibilityHidden(true)
         }
     }
