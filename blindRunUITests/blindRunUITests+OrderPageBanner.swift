@@ -66,10 +66,9 @@ extension blindRunUITests {
         wait(for: [closed], timeout: 2)
 
         let normal = app.staticTexts["普通前台通知"]
-        if normal.waitForExistence(timeout: 2) {
-            let timedOut = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: normal)
-            wait(for: [timedOut], timeout: 9)
-        }
+        XCTAssertTrue(normal.waitForExistence(timeout: 2), "前提：关掉高优先级后普通那条要顶上来，否则验不到「到点消失」")
+        let timedOut = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: normal)
+        wait(for: [timedOut], timeout: 9)
         XCTAssertFalse(banner.exists, "横幅到点没有自己消失")
         attachScreenshot(named: "order-page-banner-after", app: app)
     }
