@@ -324,6 +324,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/misc/legal-links`.
     /// - Remark: Generated from `#/paths//api/misc/legal-links/get(getLegalLinks)`.
     func getLegalLinks(_ input: Operations.getLegalLinks.Input) async throws -> Operations.getLegalLinks.Output
+    /// 通知历史（分页，时间倒序）
+    ///
+    /// 消息历史页的数据源：返回**当前登录人自己**的通知，最近的在最前，Spring 分页结构（`content` / `totalElements` / `totalPages` / `number` / `size` …）。
+    ///
+    /// - **正文** `body` 是发送时已经渲染好的那句，直接显示，不要自己按事件拼。
+    /// - **`eventType` 是开放枚举**：遇到不认识的值照常显示 `body`。少数只记了正文的通知 `eventType` 与 `priority` 为 `null`。
+    /// - **`orderId` 过滤**：订单页「这一单的消息」传它；不传 = 全部。别人的订单号不会多出任何东西（只在自己的通知里过滤）。
+    /// - **保留 90 天**（与通知记录清理任务同一个配置 `app.notification.retention-days`），更早的查不到。
+    /// - **每页最多 50 条**，`size` 超过 50 返回 400；`page` 从 0 起。
+    /// - 走散 / 信号缺失 / 邻近三类告警在历史里只出现一条。
+    /// - 与 `/since` 互不影响：`/since` 仍是断线补读（24 小时、50 条、正序），不要拿它当历史页。
+    ///
+    /// - Remark: HTTP `GET /api/notifications/history`.
+    /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)`.
+    func getHistory(_ input: Operations.getHistory.Input) async throws -> Operations.getHistory.Output
     /// 重连后补读离线期间错过的通知
     ///
     /// 盲人/志愿者 WS 重连后调用，返回 after 时间点之后、最近 24h 内、最多 50 条通知（按时间正序）。 前端按 ttsText 逐条朗读。
@@ -1954,6 +1969,29 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//api/misc/legal-links/get(getLegalLinks)`.
     public func getLegalLinks(headers: Operations.getLegalLinks.Input.Headers = .init()) async throws -> Operations.getLegalLinks.Output {
         try await getLegalLinks(Operations.getLegalLinks.Input(headers: headers))
+    }
+    /// 通知历史（分页，时间倒序）
+    ///
+    /// 消息历史页的数据源：返回**当前登录人自己**的通知，最近的在最前，Spring 分页结构（`content` / `totalElements` / `totalPages` / `number` / `size` …）。
+    ///
+    /// - **正文** `body` 是发送时已经渲染好的那句，直接显示，不要自己按事件拼。
+    /// - **`eventType` 是开放枚举**：遇到不认识的值照常显示 `body`。少数只记了正文的通知 `eventType` 与 `priority` 为 `null`。
+    /// - **`orderId` 过滤**：订单页「这一单的消息」传它；不传 = 全部。别人的订单号不会多出任何东西（只在自己的通知里过滤）。
+    /// - **保留 90 天**（与通知记录清理任务同一个配置 `app.notification.retention-days`），更早的查不到。
+    /// - **每页最多 50 条**，`size` 超过 50 返回 400；`page` 从 0 起。
+    /// - 走散 / 信号缺失 / 邻近三类告警在历史里只出现一条。
+    /// - 与 `/since` 互不影响：`/since` 仍是断线补读（24 小时、50 条、正序），不要拿它当历史页。
+    ///
+    /// - Remark: HTTP `GET /api/notifications/history`.
+    /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)`.
+    public func getHistory(
+        query: Operations.getHistory.Input.Query = .init(),
+        headers: Operations.getHistory.Input.Headers = .init()
+    ) async throws -> Operations.getHistory.Output {
+        try await getHistory(Operations.getHistory.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// 重连后补读离线期间错过的通知
     ///
@@ -9092,6 +9130,61 @@ public enum Components {
                 case ttsText
             }
         }
+        /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem`.
+        public struct NotificationHistoryItem: Codable, Hashable, Sendable {
+            /// 发送时已渲染好的正文，直接显示，不要自己拼
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/body`.
+            public var body: Swift.String?
+            /// 事件名（开放枚举：客户端遇到不认识的值照常显示正文）。部分只记了正文的老式通知为 null
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/eventType`.
+            public var eventType: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/id`.
+            public var id: Swift.Int64?
+            /// 所属订单；不挂订单的通知为 null
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/orderId`.
+            public var orderId: Swift.Int64?
+            /// 优先级 HIGH / NORMAL 等；老式通知为 null
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/priority`.
+            public var priority: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem/sentAt`.
+            public var sentAt: Swift.String?
+            /// Creates a new `NotificationHistoryItem`.
+            ///
+            /// - Parameters:
+            ///   - body: 发送时已渲染好的正文，直接显示，不要自己拼
+            ///   - eventType: 事件名（开放枚举：客户端遇到不认识的值照常显示正文）。部分只记了正文的老式通知为 null
+            ///   - id:
+            ///   - orderId: 所属订单；不挂订单的通知为 null
+            ///   - priority: 优先级 HIGH / NORMAL 等；老式通知为 null
+            ///   - sentAt:
+            public init(
+                body: Swift.String? = nil,
+                eventType: Swift.String? = nil,
+                id: Swift.Int64? = nil,
+                orderId: Swift.Int64? = nil,
+                priority: Swift.String? = nil,
+                sentAt: Swift.String? = nil
+            ) {
+                self.body = body
+                self.eventType = eventType
+                self.id = id
+                self.orderId = orderId
+                self.priority = priority
+                self.sentAt = sentAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case body
+                case eventType
+                case id
+                case orderId
+                case priority
+                case sentAt
+            }
+        }
         /// 一块开放范围，经纬度矩形，四条边都算在范围内。坐标系 GCJ-02。矩形只是近似，不等于行政边界
         ///
         /// - Remark: Generated from `#/components/schemas/OpenArea`.
@@ -10656,6 +10749,83 @@ public enum Components {
                 case status
                 case volunteerStats
                 case volunteerTrack
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem`.
+        public struct PageNotificationHistoryItem: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/content`.
+            public var content: [Components.Schemas.NotificationHistoryItem]?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/empty`.
+            public var empty: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/first`.
+            public var first: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/last`.
+            public var last: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/number`.
+            public var number: Swift.Int32?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/numberOfElements`.
+            public var numberOfElements: Swift.Int32?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/pageable`.
+            public var pageable: Components.Schemas.PageableObject?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/size`.
+            public var size: Swift.Int32?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/sort`.
+            public var sort: Components.Schemas.SortObject?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/totalElements`.
+            public var totalElements: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/PageNotificationHistoryItem/totalPages`.
+            public var totalPages: Swift.Int32?
+            /// Creates a new `PageNotificationHistoryItem`.
+            ///
+            /// - Parameters:
+            ///   - content:
+            ///   - empty:
+            ///   - first:
+            ///   - last:
+            ///   - number:
+            ///   - numberOfElements:
+            ///   - pageable:
+            ///   - size:
+            ///   - sort:
+            ///   - totalElements:
+            ///   - totalPages:
+            public init(
+                content: [Components.Schemas.NotificationHistoryItem]? = nil,
+                empty: Swift.Bool? = nil,
+                first: Swift.Bool? = nil,
+                last: Swift.Bool? = nil,
+                number: Swift.Int32? = nil,
+                numberOfElements: Swift.Int32? = nil,
+                pageable: Components.Schemas.PageableObject? = nil,
+                size: Swift.Int32? = nil,
+                sort: Components.Schemas.SortObject? = nil,
+                totalElements: Swift.Int64? = nil,
+                totalPages: Swift.Int32? = nil
+            ) {
+                self.content = content
+                self.empty = empty
+                self.first = first
+                self.last = last
+                self.number = number
+                self.numberOfElements = numberOfElements
+                self.pageable = pageable
+                self.size = size
+                self.sort = sort
+                self.totalElements = totalElements
+                self.totalPages = totalPages
+            }
+            public enum CodingKeys: String, CodingKey {
+                case content
+                case empty
+                case first
+                case last
+                case number
+                case numberOfElements
+                case pageable
+                case size
+                case sort
+                case totalElements
+                case totalPages
             }
         }
         /// - Remark: Generated from `#/components/schemas/PageOrderDetailResponse`.
@@ -20857,6 +21027,228 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// 通知历史（分页，时间倒序）
+    ///
+    /// 消息历史页的数据源：返回**当前登录人自己**的通知，最近的在最前，Spring 分页结构（`content` / `totalElements` / `totalPages` / `number` / `size` …）。
+    ///
+    /// - **正文** `body` 是发送时已经渲染好的那句，直接显示，不要自己按事件拼。
+    /// - **`eventType` 是开放枚举**：遇到不认识的值照常显示 `body`。少数只记了正文的通知 `eventType` 与 `priority` 为 `null`。
+    /// - **`orderId` 过滤**：订单页「这一单的消息」传它；不传 = 全部。别人的订单号不会多出任何东西（只在自己的通知里过滤）。
+    /// - **保留 90 天**（与通知记录清理任务同一个配置 `app.notification.retention-days`），更早的查不到。
+    /// - **每页最多 50 条**，`size` 超过 50 返回 400；`page` 从 0 起。
+    /// - 走散 / 信号缺失 / 邻近三类告警在历史里只出现一条。
+    /// - 与 `/since` 互不影响：`/since` 仍是断线补读（24 小时、50 条、正序），不要拿它当历史页。
+    ///
+    /// - Remark: HTTP `GET /api/notifications/history`.
+    /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)`.
+    public enum getHistory {
+        public static let id: Swift.String = "getHistory"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/notifications/history/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// 只看这一单的通知；不传 = 全部
+                ///
+                /// - Remark: Generated from `#/paths/api/notifications/history/GET/query/orderId`.
+                public var orderId: Swift.Int64?
+                /// - Remark: Generated from `#/paths/api/notifications/history/GET/query/page`.
+                public var page: Swift.Int32?
+                /// - Remark: Generated from `#/paths/api/notifications/history/GET/query/size`.
+                public var size: Swift.Int32?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - orderId: 只看这一单的通知；不传 = 全部
+                ///   - page:
+                ///   - size:
+                public init(
+                    orderId: Swift.Int64? = nil,
+                    page: Swift.Int32? = nil,
+                    size: Swift.Int32? = nil
+                ) {
+                    self.orderId = orderId
+                    self.page = page
+                    self.size = size
+                }
+            }
+            public var query: Operations.getHistory.Input.Query
+            /// - Remark: Generated from `#/paths/api/notifications/history/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.getHistory.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.getHistory.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.getHistory.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.getHistory.Input.Query = .init(),
+                headers: Operations.getHistory.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/notifications/history/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/notifications/history/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PageNotificationHistoryItem)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PageNotificationHistoryItem {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.getHistory.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.getHistory.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// 成功
+            ///
+            /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.getHistory.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.getHistory.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Unauthorized: Sendable, Hashable {
+                /// Creates a new `Unauthorized`.
+                public init() {}
+            }
+            /// 未认证
+            ///
+            /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Operations.getHistory.Output.Unauthorized)
+            /// 未认证
+            ///
+            /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            public static var unauthorized: Self {
+                .unauthorized(.init())
+            }
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Operations.getHistory.Output.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// Creates a new `Forbidden`.
+                public init() {}
+            }
+            /// 非 BLIND/VOLUNTEER 角色
+            ///
+            /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.getHistory.Output.Forbidden)
+            /// 非 BLIND/VOLUNTEER 角色
+            ///
+            /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            public static var forbidden: Self {
+                .forbidden(.init())
+            }
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.getHistory.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
                             response: self
                         )
                     }

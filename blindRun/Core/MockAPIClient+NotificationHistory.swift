@@ -4,6 +4,15 @@ extension MockAPIClient {
     /// 后端每页上限 50，超过回 400（契约 `/api/notifications/history`）。
     static let mockNotificationHistoryMaxPageSize = 50
 
+    /// `GET /api/notifications/*` 的分发：路由函数已超长，新增一条读接口不许再让它变大，所以收在这里。
+    func handleGetNotifications(path: String, query: [String: String]?) throws -> Any {
+        switch path {
+        case "/api/notifications/history": return try handleGetNotificationHistory(query: query)
+        case "/api/notifications/since": return try handleGetMissedNotifications(after: query?["after"])
+        default: throw APIError.invalidURL
+        }
+    }
+
     /// `GET /api/notifications/history`：只返回当前登录人自己的通知，倒序，Spring 分页。
     /// Mock 里只有一个登录人，所以语料不分人；`orderId` 过滤照契约做。
     func handleGetNotificationHistory(query: [String: String]?) throws -> NotificationHistoryPage {

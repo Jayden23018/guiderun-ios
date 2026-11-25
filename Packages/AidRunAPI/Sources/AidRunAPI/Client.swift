@@ -1893,6 +1893,101 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// 通知历史（分页，时间倒序）
+    ///
+    /// 消息历史页的数据源：返回**当前登录人自己**的通知，最近的在最前，Spring 分页结构（`content` / `totalElements` / `totalPages` / `number` / `size` …）。
+    ///
+    /// - **正文** `body` 是发送时已经渲染好的那句，直接显示，不要自己按事件拼。
+    /// - **`eventType` 是开放枚举**：遇到不认识的值照常显示 `body`。少数只记了正文的通知 `eventType` 与 `priority` 为 `null`。
+    /// - **`orderId` 过滤**：订单页「这一单的消息」传它；不传 = 全部。别人的订单号不会多出任何东西（只在自己的通知里过滤）。
+    /// - **保留 90 天**（与通知记录清理任务同一个配置 `app.notification.retention-days`），更早的查不到。
+    /// - **每页最多 50 条**，`size` 超过 50 返回 400；`page` 从 0 起。
+    /// - 走散 / 信号缺失 / 邻近三类告警在历史里只出现一条。
+    /// - 与 `/since` 互不影响：`/since` 仍是断线补读（24 小时、50 条、正序），不要拿它当历史页。
+    ///
+    /// - Remark: HTTP `GET /api/notifications/history`.
+    /// - Remark: Generated from `#/paths//api/notifications/history/get(getHistory)`.
+    public func getHistory(_ input: Operations.getHistory.Input) async throws -> Operations.getHistory.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.getHistory.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/notifications/history",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "orderId",
+                    value: input.query.orderId
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "page",
+                    value: input.query.page
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "size",
+                    value: input.query.size
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.getHistory.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PageNotificationHistoryItem.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                case 401:
+                    return .unauthorized(.init())
+                case 403:
+                    return .forbidden(.init())
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// 重连后补读离线期间错过的通知
     ///
     /// 盲人/志愿者 WS 重连后调用，返回 after 时间点之后、最近 24h 内、最多 50 条通知（按时间正序）。 前端按 ttsText 逐条朗读。

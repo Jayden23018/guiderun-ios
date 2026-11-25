@@ -48,6 +48,7 @@ filter:
     - /api/emergency/{eventId}/cancel
     - /api/emergency/{eventId}/volunteer-response
     - /api/misc/legal-links
+    - /api/notifications/history
     - /api/notifications/since
     - /api/orders
     - /api/orders/active
