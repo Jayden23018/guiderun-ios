@@ -101,21 +101,24 @@ export function checkVendorPrivacyManifest({ filePath, body }) {
 export function checkSdkOnlyReasonCode({ filePath, body }) {
   // (b) 把「仅限第三方 SDK」的 reason code 抄进主 App 的清单
   //
-  // Apple 对 1C8F.1（UserDefaults）与 3B52.1（FileTimestamp）逐字写着
-  // "This reason may only be declared by third-party SDKs"。阿里云的 roll-up 清单里两条都有，
-  // 而「把 vendor 清单的内容合并进主 App 清单」正是修 ITMS-91053 时最自然的动作 ——
+  // Apple 对 0A2A.1（FileTimestamp）与 C56D.1（UserDefaults）逐字写着
+  // "This reason may only be declared by third-party SDKs"（2026-11-25 按官方 JSON 的 term / definition
+  // 配对核对；此前这里写成 3B52.1 / 1C8F.1，是把文档页「码在前、定义在后」读错了一位）。
+  // 1C8F.1 不是 SDK 专用，但它只给有 App Group 的 App 用；本 App 没有 App Group，一并拦下。
+  // 「把 vendor 清单的内容合并进主 App 清单」正是修 ITMS-91053 时最自然的动作 ——
   // 抄进来换到的是 ITMS-91055 无效理由，且要等下一次上传才知道。
   // 路径按「含不含 /Vendor/」判，不能锚在字符串开头 —— 钩子拿到的是绝对路径。
   const isAppManifest = /\.xcprivacy$/.test(filePath) && !/(^|\/)Vendor\//.test(filePath);
   const sdkOnlyCodeLine = isAppManifest
-    ? body.split('\n').find((l) => /<string>\s*(3B52\.1|1C8F\.1)\s*<\/string>/.test(l))
+    ? body.split('\n').find((l) => /<string>\s*(0A2A\.1|C56D\.1|1C8F\.1)\s*<\/string>/.test(l))
     : undefined;
   if (sdkOnlyCodeLine) {
     fail(
       'sdk-only-reason-code',
       `${filePath}\n  ${sdkOnlyCodeLine.trim()}\n\n` +
-        `1C8F.1 与 3B52.1 是 Apple 明写「仅限第三方 SDK 声明」的 reason code，主 App 的清单里填了会触发 ITMS-91055。\n` +
-        `主 App 该用的对应项：UserDefaults → CA92.1；FileTimestamp → DDA9.1（App 容器内文件）或 C617.1（用户经文档选择器授权的文件）。\n` +
+        `0A2A.1 与 C56D.1 是 Apple 明写「仅限第三方 SDK 声明」的 reason code，主 App 的清单里填了会触发 ITMS-91055。\n` +
+        `1C8F.1 只给有 App Group 的 App 用，本 App 没有 App Group entitlement。\n` +
+        `主 App 该用的对应项：UserDefaults → CA92.1；FileTimestamp → C617.1（App 容器内文件）或 3B52.1（用户经文档选择器授权的文件）。\n` +
         `注意别照抄 Vendor/ 下第三方 SDK 的 roll-up 清单，那份是按「第三方 SDK」身份写的。`
     );
   }
