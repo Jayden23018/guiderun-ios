@@ -1,0 +1,58 @@
+<!doctype html><html lang="zh-Hans"><head><meta charset="utf-8"><title>盲人首页「加入日历」换按钮形式（2026-11-25）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC",sans-serif;background:#E9EAEE;color:#14171F;padding:28px 32px 40px}
+h1{font-size:22px;margin-bottom:6px}.lead{font-size:13px;color:#4A4F5C;line-height:1.7;max-width:1250px;margin-bottom:22px}
+.g{display:flex;gap:28px;align-items:flex-start}.cell{width:390px}
+.cap{font-size:15px;font-weight:700;margin:14px 0 6px}
+.anno{padding:12px 14px;background:#fff;border-radius:12px;font-size:12.5px;color:#4A4F5C;line-height:1.6}
+.ph{width:390px;height:844px;border-radius:44px;overflow:hidden;position:relative;background:#F4F5F8;box-shadow:0 0 0 10px #111,0 10px 30px rgba(0,0,0,.25);padding:58px 20px 0}
+.sb{position:absolute;top:16px;left:34px;right:30px;display:flex;justify-content:space-between;font-size:15px;font-weight:600}
+.hi{display:flex;justify-content:space-between;align-items:center;margin:14px 4px 16px}.hi b{font-size:34px}
+.spk{width:56px;height:56px;border-radius:28px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card{background:#1E2659;border-radius:24px;padding:22px 22px 18px;color:#fff}
+.card .k{font-size:15px;color:#C9CFEA}.card .t{font-size:52px;font-weight:700;margin:6px 0 14px}
+.card .p{font-size:17px;padding:12px 0;border-top:1px solid rgba(255,255,255,.15)}.card .p small{display:block;font-size:14px;color:#C9CFEA;margin-top:2px}
+.open{margin-top:12px;height:50px;border-radius:14px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:17px;font-weight:700}
+.book{margin-top:14px;background:#DCE6FB;border-radius:22px;padding:18px;display:flex;gap:16px;align-items:center}
+.plus{width:56px;height:56px;border-radius:28px;background:#2459D8;color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center}
+.book b{font-size:21px}.book p{font-size:14px;color:#4A4F5C;margin-top:4px}
+.tab{position:absolute;left:0;right:0;bottom:0;height:84px;background:#fff;border-top:1px solid #E1E2E6;display:flex;justify-content:space-around;padding-top:14px;font-size:14px;color:#8A8F9A}.tab b{color:#2459D8}
+.old{margin-top:14px;height:56px;border-radius:28px;background:#E8EFFF;border:1.5px solid #2459D8;color:#2459D8;font-size:18px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.bad{outline:3px dashed #D7263D;outline-offset:4px}
+.link{margin-top:6px;height:64px;display:flex;align-items:center;gap:10px;padding:0 6px;color:#2459D8;font-size:18px;font-weight:600}
+.row{margin-top:14px;height:64px;border-radius:18px;background:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;font-size:18px;font-weight:600}
+.row .ic{width:36px;height:36px;border-radius:10px;background:#FFE9E6;color:#D7263D;font-size:12px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.row .ic i{font-style:normal;font-size:16px;color:#14171F}
+.row small{display:block;font-size:13px;color:#6A6F7A;font-weight:400;margin-top:2px}
+.row .ch{margin-left:auto;color:#A3A7B0;font-size:20px}
+.cal{font-size:22px}
+</style></head><body>
+<h1>盲人首页「加入日历」：换掉那枚浅蓝描边大按钮</h1>
+<p class="lead">现在「加入日历」是一枚整宽 56pt 的浅蓝底蓝描边胶囊，夹在深蓝订单卡和浅蓝「预约新的陪跑」之间：两块浅蓝叠在一起，抢了「预约新的陪跑」的样子，看着像第二个主操作。<br>
+下面两个方向都把它降成「附属于这张订单」的次要入口。可点高度都保持 64pt（盲人端整行可点的下限），读屏说法和提示不变。不放进深蓝卡里：整张卡是一个按钮、一个读屏元素，卡里再嵌按钮会让读屏分不清。地址、姓名为示例。</p>
+<div class="g">
+<div class="cell"><div class="ph"><div class="sb"><span>9:41</span><span>●●● ▮</span></div>
+ <div class="hi"><b>你好，李明</b><div class="spk">🔈</div></div>
+ <div class="card"><div class="k">下一次陪跑，已确认</div><div class="t">明天 7:00</div><div class="p">📍 深圳湾公园 南门</div><div class="p">陪跑员 张*<small>陪跑 32 次</small></div><div class="open">打开订单<span>›</span></div></div>
+ <div class="old bad">加入日历</div>
+ <div class="book"><div class="plus">+</div><div><b>预约新的陪跑</b><p>选好时间和地点，系统帮你找陪跑员</p></div></div>
+ <div class="tab"><b>首页</b><span>记录</span><span>我的</span></div></div>
+<div class="cap">现在</div><div class="anno">红框：整宽胶囊、浅蓝底，与下面的浅蓝预约块同色相邻，像两个并列的主操作。</div></div>
+
+<div class="cell"><div class="ph"><div class="sb"><span>9:41</span><span>●●● ▮</span></div>
+ <div class="hi"><b>你好，李明</b><div class="spk">🔈</div></div>
+ <div class="card"><div class="k">下一次陪跑，已确认</div><div class="t">明天 7:00</div><div class="p">📍 深圳湾公园 南门</div><div class="p">陪跑员 张*<small>陪跑 32 次</small></div><div class="open">打开订单<span>›</span></div></div>
+ <div class="row"><div class="ic">11月<i>26</i></div><div>加入日历<small>到点前系统日历会提醒你</small></div><span class="ch">›</span></div>
+ <div class="book"><div class="plus">+</div><div><b>预约新的陪跑</b><p>选好时间和地点，系统帮你找陪跑员</p></div></div>
+ <div class="tab"><b>首页</b><span>记录</span><span>我的</span></div></div>
+<div class="cap">甲（推荐）：白色列表行</div><div class="anno">白底圆角行，左边小日历图标（显示这一单的日期），右边箭头。和首页多张预约时下面的白色条目同一种样子（#825 乙），一眼看出是「这张订单附带的一项」，不再像按钮。整行 64pt 可点。</div></div>
+
+<div class="cell"><div class="ph"><div class="sb"><span>9:41</span><span>●●● ▮</span></div>
+ <div class="hi"><b>你好，李明</b><div class="spk">🔈</div></div>
+ <div class="card"><div class="k">下一次陪跑，已确认</div><div class="t">明天 7:00</div><div class="p">📍 深圳湾公园 南门</div><div class="p">陪跑员 张*<small>陪跑 32 次</small></div><div class="open">打开订单<span>›</span></div></div>
+ <div class="link"><span class="cal">📅</span>加入日历</div>
+ <div class="book" style="margin-top:6px"><div class="plus">+</div><div><b>预约新的陪跑</b><p>选好时间和地点，系统帮你找陪跑员</p></div></div>
+ <div class="tab"><b>首页</b><span>记录</span><span>我的</span></div></div>
+<div class="cap">乙：图标 + 蓝字链接</div><div class="anno">没有底色和描边，只有日历图标和蓝字，左对齐贴在卡片下面。最轻；但低视力用户可能不容易注意到它能点（看不出边界），可点区域照样 64pt 高、整行宽。</div></div>
+</div></body></html>

@@ -14,6 +14,8 @@ import SwiftUI
 
 enum BlindRunCalendarExport {
     static let buttonTitle = "加入日历"
+    /// 首页那一行的第二行小字。时长取日程自带提醒的提前量（`alarmOffset`），改一处两处一起变。
+    static let rowSubtitle = "开跑前 \(Int(BlindRunStartReminder.leadTime / 3600)) 小时，系统日历会提醒你"
 
     /// 写进日程备注。日程不会跟着订单变，得让用户知道要自己删。
     static let notes = "这条日程是从助盲跑加入的。订单取消或改了时间，日程不会跟着变，请自己删掉或修改。"
@@ -49,15 +51,25 @@ enum BlindRunCalendarExport {
     }
 }
 
-/// 首页订单卡下面那枚按钮。iOS 16、或这张单不能加时整个不渲染。
+/// 首页订单卡下面那一行。iOS 16、或这张单不能加时整个不渲染。
+///
+/// 负责人 2026-11-25 选稿甲（`docs/ui/mockups/blind-home-calendar-button-20261125/`）：白底圆角列表行 +
+/// 显示这一单日期的小日历图标 + 箭头，取代整宽浅蓝描边胶囊（与下面浅蓝「预约新的陪跑」同色相邻，像第二个主操作）。
+/// 整行 64pt 可点（盲人端整行可点的下限），读屏只念「加入日历」和原来的提示。
 struct BlindRunCalendarButton: View {
     let order: OrderDetailResponse
     @State private var isPresentingEditor = false
 
+    /// 盲人端整行可点的下限。
+    private static let minRowHeight: CGFloat = 64
+
     var body: some View {
         if #available(iOS 17, *), BlindRunCalendarExport.canExport(order) {
-            Button(BlindRunCalendarExport.buttonTitle) { isPresentingEditor = true }
-                .buttonStyle(OutlineSecondaryButtonStyle())
+            Button { isPresentingEditor = true } label: { row }
+                .buttonStyle(CalendarRowButtonStyle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(BlindRunCalendarExport.buttonTitle)
+                .accessibilityAddTraits(.isButton)
                 .accessibilityHint("打开系统日历，确认后把这次陪跑加进日历。订单取消后要自己删掉这条日程")
                 .accessibilityIdentifier("blindHomeAddToCalendar")
                 .sheet(isPresented: $isPresentingEditor) {
@@ -65,6 +77,64 @@ struct BlindRunCalendarButton: View {
                         .ignoresSafeArea()
                 }
         }
+    }
+
+    private var row: some View {
+        HStack(spacing: 14) {
+            dateIcon
+            VStack(alignment: .leading, spacing: 2) {
+                Text(BlindRunCalendarExport.buttonTitle)
+                    .flowFont(FlowV2Fonts.headline())
+                    .foregroundColor(AppColors.Flow.primaryText)
+                Text(BlindRunCalendarExport.rowSubtitle)
+                    .flowFont(FlowV2Fonts.subhead())
+                    .foregroundColor(AppColors.Flow.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(AppColors.Flow.secondaryText)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: Self.minRowHeight, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    /// 小日历：上「11月」红字、下日期。取不到开始时间时退回系统日历图标（`canExport` 已挡掉这种单，只是兜底）。
+    @ViewBuilder
+    private var dateIcon: some View {
+        if let start = order.plannedStart?.backendTimestamp {
+            let parts = Calendar.current.dateComponents([.month, .day], from: start)
+            VStack(spacing: 0) {
+                Text("\(parts.month ?? 0)月")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(AppColors.destructive)
+                Text("\(parts.day ?? 0)")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppColors.Flow.primaryText)
+            }
+            .frame(width: 40, height: 40)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(AppColors.Flow.surfaceSubtle))
+            .accessibilityHidden(true)
+        } else {
+            Image(systemName: "calendar")
+                .font(.system(size: 22))
+                .frame(width: 40, height: 40)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// 白底圆角行；按下时底色换成浅灰。
+private struct CalendarRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(configuration.isPressed ? AppColors.Flow.surfaceSubtle : AppColors.Flow.surface)
+            )
     }
 }
 
