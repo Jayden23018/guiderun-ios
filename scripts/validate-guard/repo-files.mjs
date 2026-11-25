@@ -83,52 +83,52 @@ export const cases = [
   },
   {
     // Apple 逐字写着 "may only be declared by third-party SDKs"，主 App 填了换来 ITMS-91055。
-    name: '主 App 清单填第三方专用 reason code 3B52.1',
+    name: '主 App 清单填第三方专用 reason code 0A2A.1',
     expect: 2,
     input: {
       tool_name: 'Edit',
       tool_input: {
         file_path: '/x/blindRun/PrivacyInfo.xcprivacy',
         old_string: 'a',
-        new_string: '\t\t\t<array>\n\t\t\t\t<string>3B52.1</string>\n\t\t\t</array>'
+        new_string: '\t\t\t<array>\n\t\t\t\t<string>0A2A.1</string>\n\t\t\t</array>'
       }
     }
   },
   {
-    name: '主 App 清单填第三方专用 reason code 1C8F.1',
+    name: '主 App 清单填第三方专用 reason code C56D.1',
     expect: 2,
     input: {
       tool_name: 'Edit',
       tool_input: {
         file_path: '/x/blindRun/PrivacyInfo.xcprivacy',
         old_string: 'a',
-        new_string: '<string>1C8F.1</string>'
+        new_string: '<string>C56D.1</string>'
       }
     }
   },
   {
     // 主 App 该用的对应项，必须放行 —— 否则这条规则会把正确修法一起拦掉。
-    name: '主 App 清单填 App 可用的 DDA9.1',
+    name: '主 App 清单填 App 可用的 C617.1',
     expect: 0,
     input: {
       tool_name: 'Edit',
       tool_input: {
         file_path: '/x/blindRun/PrivacyInfo.xcprivacy',
         old_string: 'a',
-        new_string: '<string>DDA9.1</string>'
+        new_string: '<string>C617.1</string>'
       }
     }
   },
   {
-    // 第三方 SDK **自己的**清单里 3B52.1 是合法的，不能连它一起拦。
-    name: 'Vendor 下第三方 SDK 自己的清单填 3B52.1',
+    // 第三方 SDK **自己的**清单里 0A2A.1 是合法的，不能连它一起拦。
+    name: 'Vendor 下第三方 SDK 自己的清单填 0A2A.1',
     expect: 0,
     input: {
       tool_name: 'Edit',
       tool_input: {
         file_path: '/x/Vendor/AliyunCloudAuth/2.3.50/PrivacyInfo.xcprivacy',
         old_string: 'a',
-        new_string: '<string>3B52.1</string>'
+        new_string: '<string>0A2A.1</string>'
       }
     }
   },

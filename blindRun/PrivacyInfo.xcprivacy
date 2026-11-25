@@ -18,14 +18,18 @@
      App bundle（静态库不会被 embed）。实测符号：
        DiskSpace     statfs / fstatfs / NSFileSystemFreeSize  → APPSecuritySDK, DTFUtility, faceguard
        FileTimestamp attributesOfItemAtPath / NSFileCreationDate / stat → 9 个 framework 中多个
-     ⚠️ 且**不能照抄**阿里云那份 roll-up 的 reason code：7D9E.1 限「健康研究类 App」、
-     E174.1 要求把磁盘信息显著展示在用户主动提交的 bug 报告里、3B52.1 与 1C8F.1 明写
-     "may only be declared by third-party SDKs" —— 抄进主 App 清单会触发 ITMS-91055。
+     ⚠️ 且**不能照抄**阿里云那份 roll-up 的 reason code，每个码按 Apple 原文的定义判：
+     B728.1 限「健康研究类 App」；7D9E.1 / 3D61.1 要求把信息显著展示在用户主动提交的 bug 报告里；
+     0A2A.1（文件时间戳）与 C56D.1（UserDefaults）明写 "may only be declared by third-party SDKs"。
+     ⚠️ Apple 文档页是「先列码、再写这个码的定义」。2026-11-25 前本文件按「定义在前、码在后」
+     读错了一位，把 DiskSpace 填成 85F4.1（那是「向用户显示磁盘空间」）、FileTimestamp 填成
+     DDA9.1（那是「向用户显示文件时间戳」）。核对时读官方 JSON 的 term / definition 配对：
+     https://developer.apple.com/tutorials/data/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype.json
 
   ✅ CoreMotion（`RunMotionRecorder.swift` 的 CMPedometer / CMAltimeter，跑后运动记录）**不需要在这里加条目**：
      它不属于 required-reason API 的五个类别（文件时间戳 / 磁盘空间 / 活动键盘 / 系统启动时间 / UserDefaults）。
      该文件里唯一落在这五类里的是 UserDefaults（锚点持久化），已由下面 CA92.1 覆盖。
-     ⚠️ 上面的类别清单来自本文件既有记载，2026-09-30 想回 Apple 文档页核对时页面靠 JS 渲染抓不到，**未逐字核对**。
+     上面的五个类别 2026-11-25 已按 Apple 官方 JSON 文档逐字核对。
      步数 / 步频 / 爬升属「健身」类数据，归 App Store Connect 隐私标签（Health & Fitness → Fitness），不在这里另写一份。
 
   ⚠️ 新增任何用到下列 API 的代码，必须回来加一条，否则下次上传直接被拒：
@@ -68,26 +72,28 @@
 		</dict>
 		<dict>
 			<!-- 来源：链进主二进制的阿里云静态库（APPSecuritySDK / DTFUtility / faceguard）
-			     85F4.1 = 写文件前检查空间是否足够 / 空间不足时删文件，是活体检测落盘模型与临时帧的行为。
-			     ⚠️ 不填 7D9E.1（限健康研究类 App）、不填 E174.1（要求把磁盘信息显著展示在
-			     用户主动提交的 bug 报告里）—— 本 App 两者都不成立，填了是虚假声明。 -->
+			     E174.1 = 写文件前检查空间是否足够 / 空间不足时删文件，是活体检测落盘模型与临时帧的行为。
+			     ⚠️ 不填 85F4.1（向用户显示磁盘空间，本 App 不显示）、不填 7D9E.1（要求把磁盘信息
+			     显著展示在用户主动提交的 bug 报告里）、不填 B728.1（限健康研究类 App）
+			     —— 本 App 都不成立，填了是虚假声明。 -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
-				<string>85F4.1</string>
+				<string>E174.1</string>
 			</array>
 		</dict>
 		<dict>
 			<!-- 来源：链进主二进制的阿里云静态库（attributesOfItemAtPath / NSFileCreationDate / stat）
-			     DDA9.1 = 读 App 容器内文件的时间戳与大小等元数据，SDK 读的是自己写在容器里的文件。
-			     ⚠️ 不填 3B52.1（Apple 明写 "may only be declared by third-party SDKs"），
-			     不填 C617.1（那条是用户经文档选择器显式授权的文件，本 App 没有文档选择器）。 -->
+			     C617.1 = 读 App 容器内文件的时间戳与大小等元数据，SDK 读的是自己写在容器里的文件。
+			     ⚠️ 不填 DDA9.1（向用户显示文件时间戳，本 App 不显示）、不填 0A2A.1（Apple 明写
+			     "may only be declared by third-party SDKs"）、不填 3B52.1（那条是用户经文档选择器
+			     显式授权的文件，本 App 没有文档选择器）。 -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
-				<string>DDA9.1</string>
+				<string>C617.1</string>
 			</array>
 		</dict>
 	</array>
