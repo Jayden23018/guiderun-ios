@@ -255,7 +255,8 @@ final class IncentiveAdoptionTests: XCTestCase {
             InviteCodeCopy.pointsDisclaimer
         ] + InviteCodeCopy.rules.flatMap { [$0.title, $0.detail] }
         // 「不能兑换现金」这类**否定式**表述是允许的，被禁的是承诺可兑换。
-        let forbidden = ["可兑换", "可提现", "可转让", "转赠", "积分商城已上线", "敬请期待", "折算"]
+        // 「开发中」「积分商城」：审核指南 2.1(a) 要求送审前清掉占位内容，首版没有商城（#1017）。
+        let forbidden = ["可兑换", "可提现", "可转让", "转赠", "积分商城", "敬请期待", "开发中", "折算"]
         for copy in copies {
             for word in forbidden {
                 XCTAssertFalse(copy.contains(word), "「\(word)」不该出现在：\(copy)")
