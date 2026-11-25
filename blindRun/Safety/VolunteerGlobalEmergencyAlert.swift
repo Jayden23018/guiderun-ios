@@ -1,16 +1,19 @@
 import CoreLocation
 import SwiftUI
+import UIKit
 
-/// 陪跑员端的全局求助警报（#1012）。挂在陪跑员标签栏根上，盖住 App 里的任何一页。
+/// 陪跑员端的全局求助警报（#1012）。挂在陪跑员标签栏根上，任何页、任何 sheet 之上都看得见。
 ///
-/// 此前警报只挂在订单页（`VolunteerInServiceView`）：跑者按了求助，陪跑员正好在首页、记录或「我的」，
-/// 只有一条 5 秒横幅。现在全屏盖层不管他在哪一页都会弹出，直到他确认或求助被本人 / 客服结束。
+/// **为什么是独立 `UIWindow` 而不是 `fullScreenCover`**：SwiftUI 的 sheet / cover 同一个视图层级同时只能呈现一个。
+/// 陪跑员正开着订单页的 sheet（求助面板、取消确认……）时，根上的 cover 弹不出来，而那恰是最需要它的时刻。
+/// 独立 window 不走 SwiftUI 的呈现机制，也不会被 sheet 盖住。
 ///
-/// 🔴 仍然**没有关闭按钮**，也没有「误触」：陪跑员不能撤销跑者的求助（后端 403
-/// `EMERGENCY_VOLUNTEER_CANNOT_DISMISS`，见 `VolunteerEmergencyAlertView`）。
+/// 两种形态（`mode`，纯函数 `Mode.resolve`）：
+/// - `.full`：有未确认的告警，整屏盖层 + 警报音。**没有关闭按钮**：陪跑员不能撤销跑者的求助
+///   （后端 403 `EMERGENCY_VOLUNTEER_CANNOT_DISMISS`）。
+/// - `.bar`：已确认但求助没结束，屏幕顶上一条常驻红条，点它回到警报（不再响）。求助结束（`volunteerAlert` 置 nil）时消失。
 ///
-/// 订单页不再自己挂盖层 —— 两层同时挂会让 SwiftUI 在同一个视图层级上重复呈现。
-/// 订单页里那条「确认需要帮助」横幅（`emergencySection`）保留，确认之后它仍承载求助结果文案。
+/// 订单页不再自己挂盖层。订单页里那条「确认需要帮助」横幅（`emergencySection`）保留，确认之后它仍承载求助结果文案。
 struct VolunteerGlobalEmergencyAlert: ViewModifier {
     @ObservedObject var coordinator: EmergencyCoordinator
     @EnvironmentObject private var appState: AppState
@@ -18,33 +21,29 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
     @EnvironmentObject private var locationService: LocationService
     @EnvironmentObject private var amapGeocodingService: AMapGeocodingService
 
-    @State private var peer: VolunteerEmergencyAlertPeer?
-    @State private var isAcknowledging = false
+    @StateObject private var presenter = VolunteerEmergencyWindowPresenter()
 
     static let acknowledgeFailure = "确认失败，请重试。若情况危急请立即拨打120或110。"
 
+    private var mode: VolunteerEmergencyWindowMode {
+        .resolve(alert: coordinator.volunteerAlert, isReviewing: presenter.isReviewing)
+    }
+
     func body(content: Content) -> some View {
         content
-            .volunteerEmergencyAlertCover(
-                coordinator: coordinator,
-                peerName: peer?.name,
-                peerPhone: peer?.phone,
-                deviceCoordinate: locationService.currentLocation,
-                isAcknowledging: isAcknowledging,
-                reverseGeocode: { await amapGeocodingService.reverseGeocode(coordinate: $0)?.title },
-                serverAddress: { try? await appState.safety.orderLocationAddress(orderId: $0) },
-                onAcknowledge: { eventID in Task { await acknowledge(eventID: eventID) } }
-            )
+            .onAppear { sync() }
+            .onChange(of: mode) { _ in sync() }
+            .onDisappear { presenter.hide() }
             // 取不到订单时（冷启动恢复、网络慢）不阻塞警报：名字与电话缺省，其余信息照出。
             .task(id: coordinator.volunteerAlert?.orderID) {
                 guard let orderID = coordinator.volunteerAlert?.orderID else {
-                    peer = nil
+                    presenter.peer = nil
                     return
                 }
                 // 拿不到就再试几次：警报上的「打电话」靠它，网络差时一次失败不能让按钮一直缺席。
                 for attempt in 0..<3 {
                     if let detail = try? await appState.orders.orderDetail(orderId: orderID) {
-                        peer = VolunteerEmergencyAlertPeer.make(from: detail)
+                        presenter.peer = VolunteerEmergencyAlertPeer.make(from: detail)
                         return
                     }
                     if attempt < 2 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
@@ -53,16 +52,141 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
             }
     }
 
+    private func sync() {
+        presenter.apply(mode, content: {
+            AnyView(VolunteerEmergencyWindowContent(
+                coordinator: coordinator,
+                presenter: presenter,
+                locationService: locationService,
+                reverseGeocode: { await amapGeocodingService.reverseGeocode(coordinate: $0)?.title },
+                serverAddress: { try? await appState.safety.orderLocationAddress(orderId: $0) },
+                onAcknowledge: { eventID in Task { await acknowledge(eventID: eventID) } }
+            ))
+        })
+    }
+
     private func acknowledge(eventID: Int64) async {
-        guard !isAcknowledging else { return }
-        isAcknowledging = true
+        guard !presenter.isAcknowledging else { return }
+        presenter.isAcknowledging = true
         let succeeded = await coordinator.acknowledgeAsVolunteer(eventID: eventID, safety: appState.safety)
-        isAcknowledging = false
+        presenter.isAcknowledging = false
         if succeeded {
             speechService.speak(EmergencySafetyCopy.volunteerAcknowledged)
         } else {
             speechService.speakError(Self.acknowledgeFailure)
         }
+    }
+}
+
+/// 现在该显示哪一种。**纯函数**，用例 `VolunteerReceiveRunnerActionsTests`。
+enum VolunteerEmergencyWindowMode: Equatable {
+    case none, full, bar
+
+    static func resolve(alert: VolunteerEmergencyAlert?, isReviewing: Bool) -> Self {
+        guard let alert else { return .none }
+        return (!alert.isAcknowledged || isReviewing) ? .full : .bar
+    }
+}
+
+/// 管两个独立 window：整屏警报与顶部常驻条。
+@MainActor
+final class VolunteerEmergencyWindowPresenter: ObservableObject {
+    @Published var isReviewing = false
+    @Published var peer: VolunteerEmergencyAlertPeer?
+    @Published var isAcknowledging = false
+
+    private var window: UIWindow?
+    private var shownMode: VolunteerEmergencyWindowMode = .none
+    private var previousKeyWindow: UIWindow?
+
+    private static let barHeight: CGFloat = 48
+
+    func hide() {
+        shownMode = .none
+        tearDown()
+    }
+
+    func apply(_ mode: VolunteerEmergencyWindowMode, content: () -> AnyView) {
+        guard mode != shownMode else { return }
+        tearDown()
+        shownMode = mode
+        guard mode != .none,
+              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: {
+                  $0.activationState == .foregroundActive
+              }) ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        else { return }
+
+        let host = UIHostingController(rootView: content())
+        host.view.backgroundColor = .clear
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host
+        window.windowLevel = .alert + 1
+        if mode == .full {
+            previousKeyWindow = scene.windows.first { $0.isKeyWindow }
+            window.backgroundColor = UIColor(AppColors.background)
+            window.makeKeyAndVisible()
+        } else {
+            let top = scene.windows.first?.safeAreaInsets.top ?? 0
+            window.frame = CGRect(x: 0, y: 0, width: scene.coordinateSpace.bounds.width, height: top + Self.barHeight)
+            window.isHidden = false
+        }
+        self.window = window
+    }
+
+    private func tearDown() {
+        window?.isHidden = true
+        window = nil
+        previousKeyWindow?.makeKey()
+        previousKeyWindow = nil
+    }
+}
+
+/// window 里的内容：整屏警报，或顶部常驻条。
+struct VolunteerEmergencyWindowContent: View {
+    @ObservedObject var coordinator: EmergencyCoordinator
+    @ObservedObject var presenter: VolunteerEmergencyWindowPresenter
+    @ObservedObject var locationService: LocationService
+    let reverseGeocode: @MainActor (CLLocationCoordinate2D) async -> String?
+    let serverAddress: @MainActor (Int64) async -> OrderLocationAddressResponse?
+    let onAcknowledge: (Int64) -> Void
+
+    var body: some View {
+        if let alert = coordinator.volunteerAlert {
+            if !alert.isAcknowledged || presenter.isReviewing {
+                VolunteerEmergencyAlertView(
+                    alert: alert,
+                    peerName: presenter.peer?.name,
+                    peerPhone: presenter.peer?.phone,
+                    deviceCoordinate: locationService.currentLocation,
+                    isAcknowledging: presenter.isAcknowledging,
+                    // 已确认后再按这一枚只是回去，不再发第二次确认。
+                    onAcknowledge: {
+                        if alert.isAcknowledged { presenter.isReviewing = false } else { onAcknowledge(alert.eventID) }
+                    },
+                    reverseGeocode: { await reverseGeocode($0) },
+                    serverAddress: { await serverAddress($0) }
+                )
+            } else {
+                bar
+            }
+        }
+    }
+
+    private var bar: some View {
+        Button { presenter.isReviewing = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
+                Text("跑者的求助还没结束 · 点此回到警报")
+                    .font(AppFonts.caption().weight(.bold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(AppColors.destructive)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("跑者的求助还没结束")
+        .accessibilityHint("双击回到警报")
+        .accessibilityIdentifier("volunteerEmergencyBar")
     }
 }
 

@@ -2,80 +2,6 @@ import Combine
 import CoreLocation
 import SwiftUI
 
-// MARK: - 屏 5 的呈现
-
-/// 把屏 5 挂到志愿者服务页上。
-///
-/// **做成 `ViewModifier` 只为一件事**：它能 `@ObservedObject` 持有 coordinator，
-/// 而 `AppState.emergencyCoordinator` 是 `let` 不是 `@Published` ——
-/// 在页面 body 里直接读 `appState.emergencyCoordinator.volunteerAlert`
-/// **读得到值但不会跟着更新**，表现就是告警来了这一屏不弹
-/// （记忆 `nested-observableobject-does-not-republish`）。
-///
-/// 呈现条件是「有未确认的告警」。`set` 是空实现且**刻意如此**：这一屏没有关闭路径，
-/// 它只在告警被确认（`isAcknowledged`）或被本人 / 客服结束（`volunteerAlert` 置 nil）时消失。
-/// `fullScreenCover` 本来就不能下滑关掉，所以不存在「用户划走了但状态没变」这种不一致。
-struct VolunteerEmergencyAlertPresentation: ViewModifier {
-    @ObservedObject var coordinator: EmergencyCoordinator
-    let peerName: String?
-    let peerPhone: String?
-    let deviceCoordinate: CLLocationCoordinate2D?
-    let isAcknowledging: Bool
-    let reverseGeocode: @MainActor (CLLocationCoordinate2D) async -> String?
-    let serverAddress: @MainActor (Int64) async -> OrderLocationAddressResponse?
-    let onAcknowledge: (Int64) -> Void
-
-    func body(content: Content) -> some View {
-        content.fullScreenCover(
-            isPresented: Binding(
-                get: { coordinator.volunteerAlert.map { !$0.isAcknowledged } ?? false },
-                set: { _ in }
-            )
-        ) {
-            if let alert = coordinator.volunteerAlert {
-                VolunteerEmergencyAlertView(
-                    alert: alert,
-                    peerName: peerName,
-                    peerPhone: peerPhone,
-                    deviceCoordinate: deviceCoordinate,
-                    isAcknowledging: isAcknowledging,
-                    onAcknowledge: { onAcknowledge(alert.eventID) },
-                    // 现包一层而不是直接传属性：在 `fullScreenCover` 的内容闭包里把存着的 `@MainActor` 闭包原样
-                    // 交给视图，编译器会报「converting non-Sendable function value … may introduce data races」（#451）。
-                    reverseGeocode: { await reverseGeocode($0) },
-                    serverAddress: { await serverAddress($0) }
-                )
-            }
-        }
-    }
-}
-
-extension View {
-    func volunteerEmergencyAlertCover(
-        coordinator: EmergencyCoordinator,
-        peerName: String?,
-        peerPhone: String?,
-        deviceCoordinate: CLLocationCoordinate2D?,
-        isAcknowledging: Bool,
-        reverseGeocode: @escaping @MainActor (CLLocationCoordinate2D) async -> String?,
-        serverAddress: @escaping @MainActor (Int64) async -> OrderLocationAddressResponse?,
-        onAcknowledge: @escaping (Int64) -> Void
-    ) -> some View {
-        modifier(
-            VolunteerEmergencyAlertPresentation(
-                coordinator: coordinator,
-                peerName: peerName,
-                peerPhone: peerPhone,
-                deviceCoordinate: deviceCoordinate,
-                isAcknowledging: isAcknowledging,
-                reverseGeocode: reverseGeocode,
-                serverAddress: serverAddress,
-                onAcknowledge: onAcknowledge
-            )
-        )
-    }
-}
-
 // MARK: - 屏 5 · 收到紧急求助
 
 /// 志愿者端收到 `EMERGENCY_VOLUNTEER_ALERT` 时盖满整屏的强提醒。
@@ -147,6 +73,8 @@ struct VolunteerEmergencyAlertView: View {
             // 恒显示「0 秒前」—— 而冷启动恢复时那条告警可能是几十秒前的，
             // 「刚刚发生」和「我漏看了很久」对志愿者是两种完全不同的判断。
             elapsedSeconds = Int(Date().timeIntervalSince(alert.receivedAt))
+            // 已确认之后从常驻入口回来看（#1012）不再响：叫住他的任务早完成了。
+            guard !alert.isAcknowledged else { await resolvePlaceIfPossible(); return }
             EmergencyAlarm.startSiren()
             EmergencyHaptics.countdownTick()
             // 🔴 **响够就停，不无限循环。** 这一屏刻意没有关闭按钮（撤销权不在志愿者手里），

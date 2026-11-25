@@ -89,4 +89,19 @@ final class VolunteerReceiveRunnerActionsTests: XCTestCase {
         XCTAssertEqual(VolunteerEmergencyAlertPeer.make(from: detail), VolunteerEmergencyAlertPeer(name: "李*", phone: "13800001111"))
         XCTAssertNil(VolunteerEmergencyAlertPeer.make(from: nil))
     }
+
+    // MARK: 2 警报形态
+
+    func testAlertWindowModeFollowsAcknowledgementAndReview() {
+        let fresh = VolunteerEmergencyAlert(eventID: 1, orderID: 7, message: "", receivedAt: Date())
+        var acked = fresh
+        acked.isAcknowledged = true
+        XCTAssertEqual(VolunteerEmergencyWindowMode.resolve(alert: nil, isReviewing: false), .none)
+        // 未确认：整屏，且点不掉（回看标志无关）。
+        XCTAssertEqual(VolunteerEmergencyWindowMode.resolve(alert: fresh, isReviewing: false), .full)
+        // 已确认：常驻条；点它回看时又是整屏；求助结束（nil）条消失。
+        XCTAssertEqual(VolunteerEmergencyWindowMode.resolve(alert: acked, isReviewing: false), .bar)
+        XCTAssertEqual(VolunteerEmergencyWindowMode.resolve(alert: acked, isReviewing: true), .full)
+        XCTAssertEqual(VolunteerEmergencyWindowMode.resolve(alert: nil, isReviewing: true), .none)
+    }
 }
