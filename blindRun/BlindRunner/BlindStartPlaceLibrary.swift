@@ -97,11 +97,9 @@ enum BlindStartPlaceDistance {
         )
     }
 
-    /// 10 公里以内保留一位小数（稿子「3.1 公里」「0.6 公里」），再远取整。最少写 0.1，不写「0.0 公里」。
+    /// 走统一的公里规则（负责人 11-08 定，#846 D8）：一位小数，整数去掉「.0」。最少写 0.1，不写「0.0 公里」。
     static func text(meters: CLLocationDistance) -> String {
-        let kilometers = max(meters, 100) / 1000
-        if kilometers < 10 { return String(format: "%.1f 公里", kilometers) }
-        return "\(Int(kilometers.rounded())) 公里"
+        "\(RunPlanFormat.kilometresValue(max(meters, 100) / 1000)) 公里"
     }
 
     /// 读屏念的那句（稿子读屏第 6 条「离你 3.1 公里」）。

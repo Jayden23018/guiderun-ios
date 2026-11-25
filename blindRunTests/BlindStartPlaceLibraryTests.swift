@@ -46,8 +46,10 @@ final class BlindStartPlaceLibraryTests: XCTestCase {
         XCTAssertEqual(BlindStartPlaceDistance.text(meters: 30), "0.1 公里")
     }
 
-    func testTenKilometresAndBeyondAreRounded() {
-        XCTAssertEqual(BlindStartPlaceDistance.text(meters: 12_600), "13 公里")
+    /// 统一规则：十公里以上也是一位小数，整数去掉「.0」（#929）。
+    func testTenKilometresAndBeyondFollowTheUnifiedRule() {
+        XCTAssertEqual(BlindStartPlaceDistance.text(meters: 12_300), "12.3 公里")
+        XCTAssertEqual(BlindStartPlaceDistance.text(meters: 3_000), "3 公里")
     }
 
     func testSpokenDistanceSaysFromYou() {

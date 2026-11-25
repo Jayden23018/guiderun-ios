@@ -105,7 +105,8 @@ extension MockAPIClient {
     /// `GET /api/orders/active` —— 盲人端冷启动 / 断线重连恢复。
     ///
     /// ⚠️ **判据是后端的，不是客户端的**：`status ∉ {COMPLETED, CANCELLED, NO_VOLUNTEER}`，
-    /// 同时存在多条时取 `createdAt` 最近的一条（契约 `/api/orders/active` 的 description 逐字）。
+    /// 同时存在多条时取 `plannedStartTime` 最早的一条，已经在跑（`IN_PROGRESS`）的排最前，不是按 `createdAt`
+    /// （契约 `/api/orders/active` 的 description，#938）。
     /// 别"顺手"换成客户端的 `isActiveForBlindRunner` —— 那条对 `.unknown` 判 true 是为了
     /// 不让订单从界面上消失，与这里问的「后端认不认为这一单还没走完」不是同一个问题。
     ///
@@ -115,8 +116,12 @@ extension MockAPIClient {
             // 理由就是上面那段注释：这里演的是**后端**的判断，换成客户端判定
             // 会让「两边口径不一致」这件事再也看不见。 guard:allow status-set-literal
             .filter { ![.completed, .cancelled, .noVolunteer].contains($0.status) }
-            .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
-            .first
+            .min { lhs, rhs in
+                let lhsRunning = lhs.status == .inProgress, rhsRunning = rhs.status == .inProgress
+                if lhsRunning != rhsRunning { return lhsRunning }
+                // 没有开跑时间的排最后。
+                return (lhs.plannedStart?.backendLocalDate ?? .distantFuture) < (rhs.plannedStart?.backendLocalDate ?? .distantFuture)
+            }
         return ActiveOrderEnvelope(success: true, data: active)
     }
 
