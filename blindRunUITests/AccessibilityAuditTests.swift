@@ -1245,12 +1245,10 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(edit.waitForExistence(timeout: 10), "提交后没有进「等待跑者确认」")
         XCTAssertTrue(header.label.contains("确认"), "V3 标题不对：\(header.label)")
         XCTAssertFalse(app.buttons["volunteerOrderFlowPrimaryButton"].exists, "V3 此刻没有该陪跑员做的主动作，不放黄色主按钮")
-        let more = app.descendants(matching: .any)["volunteerOrderNavMoreMenu"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 5), "V3 顶栏没有「···」")
-        more.tap()
+        app.descendants(matching: .any)["volunteerOrderNavMoreMenu"].firstMatch.tap()
         XCTAssertTrue(app.buttons["volunteerIntroCallDeclineButton"].waitForExistence(timeout: 5), "V3「···」里没有「不合适」")
         XCTAssertFalse(app.buttons["volunteerIntroCallUnreachableButton"].exists, "提交过安排单 = 电话打通了，不再给「未接到来电」")
-        app.descendants(matching: .any)["volunteerIntroCallHeader"].firstMatch.tap() // 点菜单外收起
+        header.tap() // 点菜单外收起
 
         // 修改前先提示需跑者重新确认。
         edit.tap()
