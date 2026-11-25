@@ -23,6 +23,8 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
     @EnvironmentObject private var amapGeocodingService: AMapGeocodingService
 
     @StateObject private var presenter = VolunteerEmergencyWindowPresenter()
+    /// 上一次看到的警报事件号：警报从有变无时念一句（`onChange` 拿不到旧值，iOS 16）。
+    @State private var shownAlertEventID: Int64?
 
     static let acknowledgeFailure = "确认失败，请重试。若情况危急请立即拨打120或110。"
 
@@ -50,6 +52,21 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
                     if attempt < 2 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
                     if Task.isCancelled { return }
                 }
+            }
+            // 后端求助结束时不给陪跑员推事件：警报挂着就定时问一次（`keepVolunteerAlertFresh`）。
+            .task(id: coordinator.volunteerAlert?.eventID) {
+                await coordinator.keepVolunteerAlertFresh(safety: appState.safety)
+            }
+            .onReceive(appState.realtimeCoordinator.statusUpdatePublisher.receive(on: DispatchQueue.main)) { update in
+                Task { await coordinator.handleVolunteerAlertOrderStatus(orderID: update.orderId, status: update.toStatus, safety: appState.safety) }
+            }
+            .onAppear { shownAlertEventID = coordinator.volunteerAlert?.eventID }
+            .onChange(of: coordinator.volunteerAlert?.eventID) { eventID in
+                // 收起时念一句，不悄悄消失；退出登录时（`reset()`）不念。
+                if eventID == nil, shownAlertEventID != nil, appState.isLoggedIn {
+                    speechService.speak(EmergencySafetyCopy.volunteerAlertCleared)
+                }
+                shownAlertEventID = eventID
             }
     }
 

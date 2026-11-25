@@ -156,6 +156,28 @@ extension AccessibilityAuditTests {
         )
     }
 
+    /// 求助在后端结案（不推任何事件）：红条要靠轮询自己收起，不能一直挂着（负责人 2026-11-25 真机反馈）。
+    @MainActor
+    func testWalk_VolunteerEmergencyBarGoesAwayWhenTheEmergencyEnds() {
+        let app = walkthroughLaunchVolunteer(seed: "SCHEDULED_CONFIRMED", env: [
+            "AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_AFTER_SECONDS": "10",
+            "AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_ENDS_AFTER_SECONDS": "15",
+        ])
+        _ = walkthroughTapIfAppears(app, "volunteerOrderNavBackButton", timeout: 20)
+        let alert = walkthroughElement(app, "volunteerEmergencyAlert")
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "求助警报没弹出")
+        let acknowledge = walkthroughElement(app, "volunteerEmergencyAlertAcknowledge")
+        _ = walkthroughScrollTo(app, acknowledge)
+        acknowledge.tap()
+        let bar = walkthroughElement(app, "volunteerEmergencyBar")
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "确认后顶部常驻入口没出现")
+        walkthroughAttach(app, "W8-bar-before-end")
+        // 结案后最多再等一个轮询间隔（20 秒）加余量。
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: bar)
+        wait(for: [gone], timeout: 45)
+        walkthroughAttach(app, "W8-bar-after-end")
+    }
+
     @MainActor private func walkthroughVolunteerEmergencyBar(sizeName: String, arguments: [String]) throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("performAccessibilityAudit 需要 iOS 17+ 运行时") }
         let app = walkthroughLaunchVolunteer(

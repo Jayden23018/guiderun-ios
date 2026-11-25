@@ -39,6 +39,12 @@ extension blindRunApp {
                     timestamp: nil
                 ))
             )
+            // `AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_ENDS_AFTER_SECONDS`：再过 N 秒在 Mock 里结案（同后端：不推任何事件），
+            // 看警报能不能靠轮询自己收起。
+            guard let endRaw = ProcessInfo.processInfo.environment["AIDRUN_UI_TEST_VOLUNTEER_EMERGENCY_ENDS_AFTER_SECONDS"],
+                  let endSeconds = Double(endRaw) else { return }
+            try? await Task.sleep(nanoseconds: UInt64(max(0, endSeconds) * 1_000_000_000))
+            mock.activeEmergencyEvent = nil
         }
         #endif
     }
