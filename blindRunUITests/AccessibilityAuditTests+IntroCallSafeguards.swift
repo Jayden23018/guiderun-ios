@@ -31,23 +31,26 @@ extension AccessibilityAuditTests {
         )
     }
 
-    /// 陪跑员端 V1：「不合适」按下先问；「未接到来电」刚进页时不出现，原位置是一行说明。
+    /// 陪跑员端 V1：两项都在顶栏「···」（2026-11-25）。「不合适」按下先问；「未接到来电」刚进页时灰着，写明何时可用。
     @MainActor
     func testVolunteerIntroCallDeclineAsksAndUnreachableWaits() throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("performAccessibilityAudit 需要 iOS 17") }
         let app = launchVolunteerHome(seedOrderStatus: "PENDING_INTRO_CALL")
         let header = app.descendants(matching: .any)["volunteerIntroCallHeader"].firstMatch
         XCTAssertTrue(header.waitForExistence(timeout: 25), "有通话中的单时冷启动没有自动进通话页")
-        XCTAssertTrue(header.label.contains("聊完记得在这里提交结果"), "头卡没有提交提醒：\(header.label)")
+        XCTAssertTrue(header.label.contains("聊完记得回来填写见面安排"), "头卡没有提交提醒：\(header.label)")
+        XCTAssertFalse(app.buttons["volunteerIntroCallDeclineButton"].exists, "「不合适」不该再铺在底部")
 
-        XCTAssertFalse(app.buttons["volunteerIntroCallUnreachableButton"].exists, "刚进页就能按「未接到来电」")
-        XCTAssertTrue(
-            app.descendants(matching: .any)["volunteerIntroCallUnreachablePending"].firstMatch.exists,
-            "「未接到来电」还没出现时，原位置要说明什么时候出现"
-        )
+        let more = app.descendants(matching: .any)["volunteerOrderNavMoreMenu"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "通话页顶栏没有「···」")
+        more.tap()
+        let unreachable = app.buttons["volunteerIntroCallUnreachableButton"].firstMatch
+        XCTAssertTrue(unreachable.waitForExistence(timeout: 5), "「···」里没有「未接到来电」")
+        XCTAssertFalse(unreachable.isEnabled, "刚进页就能按「未接到来电」")
+        attachScreenshot(app, name: "volunteer-intro-call-more-menu")
 
         let decline = app.buttons["volunteerIntroCallDeclineButton"].firstMatch
-        XCTAssertTrue(decline.waitForExistence(timeout: 10))
+        XCTAssertTrue(decline.waitForExistence(timeout: 5), "「···」里没有「不合适」")
         decline.tap()
         let alert = app.alerts["确认不合适？"]
         XCTAssertTrue(alert.waitForExistence(timeout: 5), "按「不合适」没有先确认")

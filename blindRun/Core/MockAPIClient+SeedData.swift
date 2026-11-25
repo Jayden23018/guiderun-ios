@@ -4,6 +4,12 @@ import Foundation
 extension MockAPIClient {
     // MARK: - Seed Data
 
+    /// 种子单保持未来开始时间（UI 测试开关）。首页「加入日历」只给开始时间在未来的单（#660 B-18），
+    /// 而 `seedDemoData` 默认把有人接下的单一律挪到 20 分钟前。
+    static var seedStartsInFuture: Bool {
+        ProcessInfo.processInfo.environment["AIDRUN_UI_TEST_SEED_FUTURE_START"] == "1"
+    }
+
     func seedDemoData() {
         blindProfile = BlindProfileResponse(
             name: "测试盲人",
@@ -93,8 +99,8 @@ extension MockAPIClient {
                 endAddress: nil,
                 endLatitude: nil,
                 endLongitude: nil,
-                plannedStart: formatter.string(from: isPastMatching ? startedAt : futureDate),
-                plannedEnd: formatter.string(from: isPastMatching ? startedEnd : futureEnd),
+                plannedStart: formatter.string(from: isPastMatching && !Self.seedStartsInFuture ? startedAt : futureDate),
+                plannedEnd: formatter.string(from: isPastMatching && !Self.seedStartsInFuture ? startedEnd : futureEnd),
                 blindName: "李明",
                 blindPhone: "13800001001",
                 volunteerPhone: isPastMatching ? "13800000002" : nil,

@@ -7,10 +7,10 @@ import SwiftUI
 /// `GET /api/orders/{id}` 会 403（见 `VolunteerHomeViewModel.pendingIntroCallOrder`）。
 ///
 /// 🔄 2026-10-15 按见面安排单视觉稿 v2 重做（`docs/ui/mockups/intro-call-meetup-plan-20261015/`，#433）：
-/// - V1 等来电：主按钮「填写见面安排」（v6 是「合适，接这一单」）；次「不合适」；文字「未接到来电」
+/// - V1 等来电：主按钮「填写见面安排」（v6 是「合适，接这一单」）；「不合适」「未接到来电」在顶栏「···」（2026-11-25）
 /// - V1′ 跑者正在来电：收到 `INTRO_CALL_INCOMING` 后 2 分钟，标题换句话、播一次
 /// - V2 填写见面安排：`VolunteerMeetupPlanFormView`（表单页）
-/// - V3 等跑者确认：安排摘要；「修改见面安排」（先提示需跑者重新确认）；文字「不合适」。**不显示跑者听没听、同不同意**
+/// - V3 等跑者确认：安排摘要；「修改见面安排」（先提示需跑者重新确认）；「不合适」在「···」。**不显示跑者听没听、同不同意**
 /// - V4 约好：原地变成订单页「约好」（新增见面位置与两人上衣，见 `VolunteerOrderFlowPresentation.meetupRows`）
 /// - V4′ 没约成：「本次沟通已结束」+「返回首页」，**不自动跳转**（v6 停 3 秒自动关页，会截断播报）
 /// 头卡整步沿用匹配钢蓝 `stateMatching`，去掉 v6 的通话前紫与通话后梅红；子状态靠那句话与绳子上的图标区分。
@@ -24,6 +24,10 @@ struct VolunteerIntroCallView: View {
     @State private var showsLocalHelp = false
     @State private var showsPlanForm = false
     @State private var showsEditConfirm = false
+    @State private var confirmsDecline = false
+    @State private var confirmsUnreachable = false
+    /// 举报 / 不再匹配此人收在顶栏「···」，弹层挂在页面上，两处共用这一份开关（2026-11-25）。
+    @StateObject private var counterpartSafety = CounterpartBlockViewModel()
     @AccessibilityFocusState private var headerFocused: Bool
     /// 跑者确认那一刻（#962 第 6 项）：开了「减弱动态效果」就只做 0.25 秒淡入淡出。
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -108,8 +112,11 @@ struct VolunteerIntroCallView: View {
                 topBar: VolunteerOrderTopBar(
                     surface: .onDark,
                     onBack: { dismiss() },
+                    menu: exitMenuItems(now: context.date),
+                    counterpartSafety: safetyTarget == nil ? nil : counterpartSafety,
                     isCloudHelp: VolunteerOrderSOSMode.resolve(status: .pendingIntroCall) == .cloud,
-                    onHelp: { showsLocalHelp = true }
+                    onHelp: { showsLocalHelp = true },
+                    messagesOrderId: route.orderId
                 ),
                 eyebrow: isAwaitingConfirmation ? IntroCallCopy.volunteerPlanSubmittedEyebrow : IntroCallCopy.pageTitle,
                 title: title(incoming: incoming),
@@ -125,6 +132,8 @@ struct VolunteerIntroCallView: View {
             )
         }
         .emergencyCallOptionsDialog(isPresented: $showsLocalHelp, context: .volunteerBeforeRun, primaryContact: nil)
+        .counterpartSafetyPrompts(viewModel: counterpartSafety, target: safetyTarget, blockContext: isClosed ? .standard : .introCall)
+        .volunteerIntroCallExitPrompts(viewModel: viewModel, confirmsDecline: $confirmsDecline, confirmsUnreachable: $confirmsUnreachable)
         .alert(IntroCallCopy.volunteerEditPlanConfirmTitle, isPresented: $showsEditConfirm) {
             Button("取消", role: .cancel) {}
             Button(IntroCallCopy.volunteerEditPlanConfirmButton) { showsPlanForm = true }
@@ -231,13 +240,8 @@ struct VolunteerIntroCallView: View {
                     .accessibilityLabel(errorMessage)
                     .accessibilityIdentifier("volunteerIntroCallError")
             }
-            // 通话磨合页的举报 / 不再匹配仍铺在页面里（INDEX「举报」行：负责人 11-11 定陪跑员通话磨合页不变）。
-            if let target = CounterpartSafetyGate.target(
-                userId: viewModel.counterpartUserId,
-                orderId: route.orderId
-            ) {
-                CounterpartSafetyActions(target: target, blockContext: isClosed ? .standard : .introCall)
-            }
+            // 举报 / 不再匹配此人在顶栏「···」（负责人 2026-11-25 改 11-11 的「通话页不变」），这里只留结果一行。
+            CounterpartBlockOutcome(viewModel: counterpartSafety)
         }
     }
 
@@ -369,8 +373,8 @@ struct VolunteerIntroCallView: View {
 
     // MARK: 底栏
 
-    /// 底部按钮（v7：一枚深色实心 + 次要按钮）。「不合适」「未接到来电」留在这里不进「···」：
-    /// 两枚都自带二次确认，「未接到来电」进页满几分钟才出现（#660 V-9），菜单项装不下这两条规则。
+    /// 底部只留一枚按钮，同盲人端（负责人 2026-11-25，稿 `volunteer-intro-call-actions-20261125/`）。
+    /// 「不合适」「未接到来电」在顶栏「···」：确认框照旧，「未接到来电」前几分钟灰着并写明何时可用（#660 V-9）。
     @ViewBuilder
     private var bottomActions: some View {
         VStack(spacing: FlowMetrics.actionButtonSpacing) {
@@ -391,41 +395,45 @@ struct VolunteerIntroCallView: View {
                     showsPlanForm = true
                 }
                 .accessibilityIdentifier("volunteerOrderFlowPrimaryButton")
-                awaitingCallButtons
             }
         }
         .padding(.bottom, 4)
     }
 
-    /// V1：「不合适」与「未接到来电」。
-    ///
-    /// 🚩 **两个端点，不能合并**（`reportUnreachable` 的注释：统计口径相反）。
-    /// 两个都先确认，「未接到来电」进页满几分钟才出现（#660 V-9，见 `VolunteerIntroCallSafeguardButtons.swift`）。
-    @ViewBuilder
-    private var awaitingCallButtons: some View {
-        VStack(spacing: FlowMetrics.actionButtonSpacing) {
-            VolunteerIntroCallDeclineButton(viewModel: viewModel, look: .button)
-            VolunteerIntroCallUnreachableButton(viewModel: viewModel, orderId: route.orderId)
+    /// V3：只有「修改见面安排」（先提示需跑者重新确认）；「不合适」在「···」。
+    private var awaitingConfirmationButtons: some View {
+        BlindOrderStageButton(
+            title: IntroCallCopy.volunteerEditPlanButtonTitle,
+            style: .outline,
+            isEnabled: !viewModel.isSubmitting,
+            accessibilityHint: IntroCallCopy.volunteerEditPlanConfirmTitle
+        ) {
+            showsEditConfirm = true
         }
+        .accessibilityIdentifier("volunteerIntroCallEditPlanButton")
+    }
+}
+
+// 放在扩展里：结构体本体已超 SwiftLint type_body_length，棘轮只许它变短。
+extension VolunteerIntroCallView {
+    fileprivate var safetyTarget: CounterpartSafetyTarget? {
+        CounterpartSafetyGate.target(userId: viewModel.counterpartUserId, orderId: route.orderId)
     }
 
-    /// V3：「修改见面安排」（先提示需跑者重新确认）与文字「不合适」。
-    /// 已经提交过安排单 = 电话打通了，「未接到来电」此刻不成立，不给。
-    @ViewBuilder
-    private var awaitingConfirmationButtons: some View {
-        VStack(spacing: FlowMetrics.actionButtonSpacing) {
-            BlindOrderStageButton(
-                title: IntroCallCopy.volunteerEditPlanButtonTitle,
-                style: .outline,
-                isEnabled: !viewModel.isSubmitting,
-                accessibilityHint: IntroCallCopy.volunteerEditPlanConfirmTitle
-            ) {
-                showsEditConfirm = true
-            }
-            .accessibilityIdentifier("volunteerIntroCallEditPlanButton")
-
-            VolunteerIntroCallDeclineButton(viewModel: viewModel, look: .text)
-        }
+    /// 「···」里这次沟通的两项（`VolunteerIntroCallMenu`）。② 两项都有；③ 只有「不合适」；本轮结束后都没有。
+    fileprivate func exitMenuItems(now: Date) -> [VolunteerOrderMenuItem] {
+        guard !isClosed, viewModel.matchedTransition == nil else { return [] }
+        let firstSeen = isAwaitingConfirmation ? nil : VolunteerIntroCallUnreachableGate.noteSeen(
+            .init(orderId: route.orderId, windowEndsAt: viewModel.introCall?.windowEndsAt)
+        )
+        return VolunteerIntroCallMenu.items(
+            offersDecline: true,
+            unreachableFirstSeen: firstSeen,
+            now: now,
+            isSubmitting: viewModel.isSubmitting,
+            decline: { confirmsDecline = true },
+            unreachable: { confirmsUnreachable = true }
+        )
     }
 }
 

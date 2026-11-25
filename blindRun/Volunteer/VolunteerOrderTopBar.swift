@@ -4,7 +4,7 @@ import SwiftUI
 //
 // 与盲人端 `BlindOrderTopBar` 同一个样子（颜色、尺寸都读 `BlindOrderV7Palette` / `BlindOrderTopBarMetrics`），差在三处：
 // - 没有「重复当前状态」喇叭：那是盲人端每页必有的入口，陪跑员端从来没有；
-// - 「···」里装的是陪跑员的次要操作（我去不了、不合适、未接到来电）加举报 / 不再匹配此人；
+// - 「···」里装的是陪跑员的次要操作（我去不了、不合适、未接到来电）加举报 / 不再匹配此人、这一单的消息；
 // - identifier 沿用 v2 订单页顶栏那几个，守着它们的 UI 用例不用换判据。
 //
 // **这个组件不判订单状态**：求助走云端还是本地拨号由调用方传 `isCloudHelp`，
@@ -23,6 +23,8 @@ struct VolunteerOrderMenuItem: Identifiable {
 
     let kind: Kind
     let title: String
+    /// 菜单项第二行小字（系统菜单的副标题）。通话页「未接到来电」可用前写明何时可用。
+    var subtitle: String?
     var isDestructive = false
     var isEnabled = true
     let action: () -> Void
@@ -91,9 +93,14 @@ struct VolunteerOrderTopBar: OrderV7TopBar {
             ForEach(menu) { item in
                 Button(role: item.isDestructive ? .destructive : nil, action: item.action) {
                     Text(item.title)
+                    if let subtitle = item.subtitle { Text(subtitle) }
                 }
                 .disabled(!item.isEnabled)
                 .modifier(VolunteerOrderMenuItemIdentifier(kind: item.kind))
+            }
+            // 自己的操作与「对人 / 这一单」的几项分两组（2026-11-25 稿）。
+            if !menu.isEmpty && (counterpartSafety != nil || messagesOrderId != nil) {
+                Divider()
             }
             if let counterpartSafety {
                 CounterpartSafetyMenuItems(viewModel: counterpartSafety)
