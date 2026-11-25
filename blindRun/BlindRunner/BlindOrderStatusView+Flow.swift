@@ -164,7 +164,9 @@ extension BlindOrderStatusView {
             // ⑤–⑧ 原本没有次要操作；举报 / 不再匹配收进「···」后才有（跑步中由判定给空，不出「···」）。
             menu: counterpartMenuItems,
             sosMode: sosMode,
-            onHelp: { showSafetyHub = true }
+            onHelp: { showSafetyHub = true },
+            // 跑步中那一幕没有「···」（防误触），其余各态都给「这一单的消息」（#1025）。
+            messagesOrderId: flowPresentation?.phase.isRunning == true ? nil : orderId
         )
     }
 

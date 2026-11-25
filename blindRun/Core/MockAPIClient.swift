@@ -155,11 +155,14 @@ final class MockAPIClient: APIClientProtocol, @unchecked Sendable {
     var registeredApnsTokens: Set<String> = []
     /// `/api/notifications/since` 的补读语料。Mock 不主动产生离线通知，默认为空。
     var missedNotifications: [MissedNotificationResponse] = []
+    /// `/api/notifications/history` 的历史语料（#1025）。`init` 里 `seedNotificationHistory()` 铺几条，用例可以整个替换。
+    var notificationHistory: [NotificationHistoryItem] = []
 
     // MARK: - Init
 
     init() {
         seedDemoData()
+        seedNotificationHistory()
         seedHomeHistoryForUITestIfRequested()
         seedRunDataForUITestIfRequested()
         // Mock 默认未完成培训，而未完成培训滑不开开关。测开关本身的 UI 用例用它声明前提。

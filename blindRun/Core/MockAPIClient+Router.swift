@@ -386,8 +386,9 @@ extension MockAPIClient {
         }
 
         // 重连补读。后端要求 `after` 是 ISO-8601 字符串，传 epoch 会 400 INVALID_TIMESTAMP。
-        if path == "/api/notifications/since" && method == .get {
-            return try handleGetMissedNotifications(after: query?["after"])
+        // 通知两条读接口：`/since` 补读、`/history` 历史页（#1025，分页、倒序、可按订单过滤）。
+        if path.hasPrefix("/api/notifications/") && method == .get {
+            return try handleGetNotifications(path: path, query: query)
         }
 
         throw APIError.invalidURL

@@ -193,6 +193,9 @@ struct VolunteerSettingsView: View {
                 VolunteerSettingsAchievementsRow(response: response)
                 GroupedCardDivider()
             }
+            // 播报和横幅错过了就查不到，这里是补查的地方（#1025）。
+            NotificationHistoryEntryRow()
+            GroupedCardDivider()
             VolunteerSupportSettingsRows()
             GroupedCardDivider()
             // #521：通知开没开，拒绝过时给去系统设置的入口。

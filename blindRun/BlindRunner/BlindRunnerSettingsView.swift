@@ -168,6 +168,10 @@ struct BlindRunnerSettingsView: View {
 
     private var listGroup: some View {
         GroupedCard {
+            // 播报和横幅错过了就查不到，这里是补查的地方（#1025）。
+            NotificationHistoryEntryRow()
+
+            GroupedCardDivider()
             // 提交之后唯一能看到回复的地方（`SUPPORT_TICKET_REPLIED` 推送错过了就只剩这里）。
             NavigationLink {
                 MySupportTicketsView()
