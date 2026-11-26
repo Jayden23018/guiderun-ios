@@ -113,32 +113,25 @@ struct VolunteerProfileFirstScreen: View {
     /// identifier 沿用 `volunteerProfileIdentityRow`：十几条 UI 用例拿它判「首页渲染出来了」，
     /// 它在这一版指的是页头这一块。
     private var pageHeader: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Spacer(minLength: 0)
-                NavigationLink {
-                    VolunteerSettingsView()
-                } label: {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: avatarSide * 0.78))
-                        .foregroundColor(AppColors.textSecondary)
-                        // 默认 44pt，是系统触达下限。志愿者端不受盲人端 64pt 线约束
-                        // （`guard.mjs` 的 `small-touch-target` 显式排除 /blindRun/Volunteer/）。
-                        .frame(width: avatarSide, height: avatarSide)
-                        .contentShape(Rectangle())
+        Group {
+            // 头像和「首页」同一行、在标题右边居中（健康 App「摘要」就是这样）。
+            // 原先头像单独占一行压在标题上方：标题被推低 44pt，右上角浮着一团深灰（真机反馈 2026-11-26）。
+            // 无障碍字号下标题很宽，挤在一行会把标题折成两行，所以退回上下排。
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        settingsAvatar
+                    }
+                    pageTitle
                 }
-                .accessibilityLabel(VolunteerProfileCopy.settingsTitle)
-                .accessibilityHint(VolunteerProfileCopy.settingsHint)
-                .accessibilityIdentifier("volunteerProfileSettingsEntry")
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    pageTitle
+                    Spacer(minLength: 0)
+                    settingsAvatar
+                }
             }
-
-            Text(VolunteerProfileCopy.pageTitle)
-                .font(AppFonts.largeTitle())
-                .foregroundColor(AppColors.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 6)
         }
         .padding(.top, 4)
         // 容器上只放 identifier + `children: .contain`：不配 `.contain` 的话，
@@ -146,6 +139,42 @@ struct VolunteerProfileFirstScreen: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("volunteerProfileIdentityRow")
     }
+
+    private var pageTitle: some View {
+        Text(VolunteerProfileCopy.pageTitle)
+            .font(AppFonts.largeTitle())
+            .foregroundColor(AppColors.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, 4)
+            .padding(.bottom, 6)
+    }
+
+    /// 进设置的头像：浅蓝圆底 + 蓝色人形，和分区标题右边的蓝色文字链接是同一种「可点」的颜色。
+    /// 原先的深灰实心圆看起来像一张没加载出来的照片。
+    private var settingsAvatar: some View {
+        NavigationLink {
+            VolunteerSettingsView()
+        } label: {
+            Image(systemName: "person.fill")
+                .font(.system(size: avatarSide * Self.avatarGlyphRatio, weight: .semibold))
+                .foregroundColor(AppColors.primary)
+                .frame(width: avatarSide * Self.avatarCircleRatio, height: avatarSide * Self.avatarCircleRatio)
+                .background(AppColors.primary.opacity(0.12), in: Circle())
+                // 圆画小一圈，可点区域仍是 `avatarSide`（默认 44pt，系统触达下限）。志愿者端不受盲人端 64pt 线约束
+                // （`guard.mjs` 的 `small-touch-target` 显式排除 /blindRun/Volunteer/）。
+                .frame(width: avatarSide, height: avatarSide)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(VolunteerProfileCopy.settingsTitle)
+        .accessibilityHint(VolunteerProfileCopy.settingsHint)
+        .accessibilityIdentifier("volunteerProfileSettingsEntry")
+    }
+
+    /// 44pt 可点区域里画 36pt 的圆，和大标题的字高相当，不再比标题还抢眼。
+    private static let avatarCircleRatio: CGFloat = 36.0 / 44.0
+    /// 人形占可点区域的比例，让人形四周离圆边留出空隙。
+    private static let avatarGlyphRatio: CGFloat = 0.4
 
     // MARK: - 共用零件
 

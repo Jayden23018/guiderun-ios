@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 import XCTest
@@ -51,7 +52,43 @@ final class FailureAnnouncementTests: XCTestCase {
         XCTAssertTrue(speech.spokenHistoryForTesting.contains("服务器开小差了。"))
     }
 
+    /// 切到别的标签页再切回来，失败块重新出现、`.task` 再跑一次：同一次失败不再念、不再震
+    /// （真机反馈 2026-11-26「每次回到首页手机都震」）。
+    func testReappearingFailureIsNotSpokenAgain() {
+        let speech = SpeechService()
+        let tabs = TabSelection()
+        let host = Self.host(AnyView(TabHarness(tabs: tabs, failure: Self.failureSection("最近陪跑暂时没加载出来。"))
+            .environmentObject(speech)))
+        defer { host.window.isHidden = true }
+        Self.spin(Self.waitBeyondSettle)
+        speech.stop()
+
+        tabs.selected = 1
+        Self.spin(Self.waitBeyondSettle)
+        tabs.selected = 0
+        Self.spin(Self.waitBeyondSettle)
+
+        XCTAssertEqual(speech.spokenHistoryForTesting.filter { $0 == "最近陪跑暂时没加载出来。" }.count, 1,
+                       "实际念过：\(speech.spokenHistoryForTesting)")
+    }
+
     // MARK: - 辅助
+
+    private final class TabSelection: ObservableObject {
+        @Published var selected = 0
+    }
+
+    private struct TabHarness: View {
+        @ObservedObject var tabs: TabSelection
+        let failure: IncentiveFailureSection
+
+        var body: some View {
+            TabView(selection: $tabs.selected) {
+                failure.tag(0)
+                Text("别的标签页").tag(1)
+            }
+        }
+    }
 
     private static func failureSection(_ message: String) -> IncentiveFailureSection {
         IncentiveFailureSection(message: message, retryTitle: "重试", identifier: "failureAnnouncementTestRetry") {}
