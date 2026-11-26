@@ -75,11 +75,12 @@ enum VolunteerAvailabilitySlide {
     /// 在「暂不能接单」胶囊上向右滑，算不算一次想开启的尝试。
     ///
     /// 被挡住时胶囊只响应点按；陪跑员按习惯去滑，什么都不发生，等于没有提醒。
-    /// 向右滑过这么多就当作点按：震一下警示，打开接单前进度。
+    /// 向右滑过这么多、且横向为主，就当作点按：震一下警示，打开接单前进度。
+    /// 横向为主是为了让从胶囊上起手、略带右偏的上下滚动不被误判成「想开启」。
     static let blockedSwipeMinimum: CGFloat = 24
 
-    static func isBlockedOpenAttempt(dragX: CGFloat) -> Bool {
-        dragX.isFinite && dragX >= blockedSwipeMinimum
+    static func isBlockedOpenAttempt(dragX: CGFloat, dragY: CGFloat) -> Bool {
+        dragX.isFinite && dragY.isFinite && dragX >= blockedSwipeMinimum && dragX > abs(dragY)
     }
 }
 
@@ -300,7 +301,10 @@ struct VolunteerAvailabilitySlider: View {
             DragGesture(minimumDistance: VolunteerAvailabilitySlide.blockedSwipeMinimum)
                 .onEnded { value in
                     guard isBlocked, !isUpdating,
-                          VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: value.translation.width)
+                          VolunteerAvailabilitySlide.isBlockedOpenAttempt(
+                              dragX: value.translation.width,
+                              dragY: value.translation.height
+                          )
                     else { return }
                     HapticFeedback.play(.warning)
                     onShowProgress()
@@ -347,7 +351,6 @@ struct VolunteerAvailabilitySlider: View {
             : notice?.spoken ?? statusText
     }
 
-    /// 见 `VolunteerAvailabilitySlide.acceptsGesture` —— 停止接单那侧刻意不看 `isEnabled`。
     /// 显示「暂不能接单」胶囊而不是滑块。见 `VolunteerAvailabilitySlide.showsBlockedEntry`。
     private var isBlocked: Bool {
         VolunteerAvailabilitySlide.showsBlockedEntry(
@@ -357,6 +360,7 @@ struct VolunteerAvailabilitySlider: View {
         )
     }
 
+    /// 见 `VolunteerAvailabilitySlide.acceptsGesture` —— 停止接单那侧刻意不看 `isEnabled`。
     private var acceptsGesture: Bool {
         VolunteerAvailabilitySlide.acceptsGesture(
             isAvailable: isAvailable,

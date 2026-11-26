@@ -104,11 +104,16 @@ final class VolunteerProfileFirstScreenTests: XCTestCase {
     /// 在「暂不能接单」胶囊上向右滑要有回应；轻微抖动和向左滑不算。
     func testOnlyARealRightwardSwipeOnTheBlockedPillCountsAsAnAttempt() {
         let minimum = VolunteerAvailabilitySlide.blockedSwipeMinimum
-        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum))
-        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: 200))
-        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum - 1))
-        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: -200))
-        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: .nan))
+        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum, dragY: 0))
+        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: 200, dragY: 40))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum - 1, dragY: 0))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: -200, dragY: 0))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: .nan, dragY: 0))
+        // 从胶囊上起手的上下滚动，带一点右偏也不算想开启。
+        XCTAssertFalse(
+            VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: 30, dragY: -150),
+            "滚动首页时误打开接单前进度"
+        )
     }
 
     // MARK: - 主指标
