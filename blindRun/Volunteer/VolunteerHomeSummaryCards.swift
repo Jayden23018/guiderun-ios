@@ -182,7 +182,7 @@ struct VolunteerHomeRecentRunContent: Equatable {
 final class VolunteerHomeRecentRunModel: ObservableObject {
     /// 卡片的加载状态（#865）。`.loaded(nil)` = 本月和上月都没有记录。
     @Published private(set) var state: AsyncLoadState<VolunteerHomeRecentRunContent?> = .idle
-    /// 「这一轮算加载过了」只在拿到结果（内容或失败）时置位。
+    /// 「这一轮算加载过了」只在拿到内容时置位，失败不算（下次回首页重试）。
     /// 🚩 **取消不算结果**：志愿者一进首页就点进别的页很常见，`.task` 随之取消；
     /// 在请求前就置位的话，这张卡会整个会话停在「加载中」（同 `VolunteerHomeIncentiveViewModel`）。
     private var hasLoaded = false
@@ -234,7 +234,8 @@ final class VolunteerHomeRecentRunModel: ObservableObject {
             hasLoaded = true
         } catch {
             guard !Task.isCancelled, !(error is CancellationError), ticket == latestLoad else { return }
-            hasLoaded = true
+            // 失败不置 `hasLoaded`：下次回到首页再拉一次（同 `VolunteerHomeIncentiveViewModel`）。
+            // 置位的话，一次失败（例如刚登录时撞上 429）会让这张卡整个会话停在失败态。
             // 已经有内容时网络一抖不清掉它：上一份仍然是真的。
             if case .loaded = state { return }
             state = .failed(message: VolunteerProfileCopy.recentLoadFailure)

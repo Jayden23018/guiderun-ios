@@ -96,6 +96,22 @@ final class VolunteerIncentiveRemoteContentTests: XCTestCase {
         XCTAssertEqual(model.state, .failed(message: VolunteerProfileCopy.recentLoadFailure))
     }
 
+    /// 刚登录撞上 429 之类的一次失败后，回到首页（`.task` 再跑 `loadIfNeeded`）要再拉一次，
+    /// 不能整个会话停在「最近陪跑暂时没加载出来」（真机反馈 2026-11-26）。
+    func testHomeRecentRunRetriesOnNextVisitAfterAFailure() async {
+        let appState = AppState(
+            apiClient: VolunteerRecentRunFailOnceAPIClient(),
+            tokenStore: VolunteerIncentiveInMemoryTokenStore()
+        )
+        let model = VolunteerHomeRecentRunModel()
+        await model.loadIfNeeded(appState: appState)
+        XCTAssertEqual(model.state, .failed(message: VolunteerProfileCopy.recentLoadFailure), "前提：第一次失败")
+
+        await model.loadIfNeeded(appState: appState)
+
+        XCTAssertEqual(model.state, .loaded(nil), "第二次进首页没有重拉，卡片停在失败态")
+    }
+
     /// 从评分页、徽章页返回时 `.task` 会再拉一次：这一次失败不许把正在看的成就清掉。
     func testRefreshFailureKeepsTheAchievementsOnScreen() async throws {
         let service = FakeIncentiveService()
@@ -156,6 +172,36 @@ private final class VolunteerIncentiveFailingAPIClient: APIClientProtocol, @unch
         requiresAuth: Bool
     ) async throws -> T {
         throw URLError(.notConnectedToInternet)
+    }
+
+    func upload<T: Decodable>(
+        path: String,
+        query: [String: String]?,
+        fields: [String: String]?,
+        files: [MultipartFile],
+        requiresAuth: Bool
+    ) async throws -> T {
+        throw URLError(.notConnectedToInternet)
+    }
+}
+
+/// 第一个请求失败（像刚登录撞上 429），之后都回一个空月份。
+private final class VolunteerRecentRunFailOnceAPIClient: APIClientProtocol, @unchecked Sendable {
+    private var calls = 0
+    private static let emptyMonth = Data(
+        #"{"role":"VOLUNTEER","month":"2026-11","monthSummary":{"runs":0},"items":[]}"#.utf8
+    )
+
+    func request<T: Decodable>(
+        method: HTTPMethod,
+        path: String,
+        query: [String: String]?,
+        body: (any Encodable & Sendable)?,
+        requiresAuth: Bool
+    ) async throws -> T {
+        calls += 1
+        if calls == 1 { throw URLError(.notConnectedToInternet) }
+        return try JSONDecoder().decode(T.self, from: Self.emptyMonth)
     }
 
     func upload<T: Decodable>(

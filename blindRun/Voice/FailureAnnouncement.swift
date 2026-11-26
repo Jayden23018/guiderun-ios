@@ -18,12 +18,33 @@ import SwiftUI
 /// `attempt`：同一句失败文案、用户又重试了一次还是失败时，靠它再念一遍（#573）。不能只靠视图重建：
 /// 断网时请求可能比一帧还快地失败，页面来不及先切走再切回来，同一句文案的 `.task` 就不会重跑 ——
 /// 用户点了「重试」却听不到任何结果。
+///
+/// 🚩 **同一次失败只念一次。** `.task` 在视图每次重新出现时都会再跑（切回这个标签页、从推进去的页面返回），
+/// 不记一下的话，停在失败态的卡片每回一次首页就念一遍、震一下 —— 陪跑员端语音默认关，
+/// 用户只剩「每次回首页手机就震」（真机反馈 2026-11-26）。记的是视图状态：视图真被拆掉重建（离开整页再进来）
+/// 算一次新的出现，照常念。
 extension View {
     func announcesFailure(_ message: String, using speechService: SpeechService, attempt: Int = 0) -> some View {
-        task(id: FailureAnnouncement.Key(message: message, attempt: attempt)) {
+        modifier(FailureAnnouncementModifier(
+            key: FailureAnnouncement.Key(message: message, attempt: attempt),
+            speechService: speechService
+        ))
+    }
+}
+
+private struct FailureAnnouncementModifier: ViewModifier {
+    let key: FailureAnnouncement.Key
+    let speechService: SpeechService
+    /// 已经念过的那一次。念完才记：没等到 `settleDelay` 就被换掉的那一帧不算念过。
+    @State private var announcedKey: FailureAnnouncement.Key?
+
+    func body(content: Content) -> some View {
+        content.task(id: key) {
+            guard announcedKey != key else { return }
             try? await Task.sleep(nanoseconds: FailureAnnouncement.settleDelayNanoseconds)
             guard !Task.isCancelled else { return }
-            speechService.speakError(message)
+            announcedKey = key
+            speechService.speakError(key.message)
         }
     }
 }
