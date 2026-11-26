@@ -256,7 +256,7 @@ final class VolunteerInServiceViewModel: ObservableObject {
         defer { lastAnnouncedKilometer = max(km, lastAnnouncedKilometer ?? km) }
         guard let last = lastAnnouncedKilometer, km > last, voiceBroadcastEnabled(),
               let duration = stats?.durationText else { return }
-        speechService?.speak(VolunteerRunCopy.kilometerAnnouncement(km: km, duration: duration))
+        speechService?.speak(VolunteerRunCopy.kilometerAnnouncement(km: km, duration: duration), essential: true)
     }
 
 }

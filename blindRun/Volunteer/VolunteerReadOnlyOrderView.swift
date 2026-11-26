@@ -19,7 +19,7 @@ struct VolunteerReadOnlyOrderView: View {
                 VolunteerOrderInfoSection(order: order, distanceText: nil)
                 if order.status == .completed, let track = trackViewModel.track {
                     CompletedTrackSummaryView(track: track, recordOrderId: order.orderId, role: .volunteer) {
-                        speechService.speak(track.spokenSummary)
+                        speechService.speak(track.spokenSummary, essential: true)
                     }
                 } else if trackViewModel.isLoading {
                     ProgressView("正在加载本次路线")

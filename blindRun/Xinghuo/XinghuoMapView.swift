@@ -426,7 +426,7 @@ struct XinghuoMapView: View {
     }
 
     private func speakSummary() {
-        speechService.speak(summary, priority: .onDemand)
+        speechService.speak(summary, priority: .onDemand, essential: true)
     }
 
     /// 卡片头那个金色大数字和它的单位。盲人端是「N 对跑友正在同行」，陪跑员端是「N 位志愿者在线」。

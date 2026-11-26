@@ -81,7 +81,7 @@ extension VolunteerInServiceViewModel {
         transitionState = .idle
         errorMessage = nil
         if order?.orderId == orderID, let opensAt = pending.opensAt { order?.unilateralFinishOpensAt = opensAt }
-        speechService?.speak(FinishSafetyCopy.volunteerRequested(opensAt: pending.opensAt))
+        speechService?.speak(FinishSafetyCopy.volunteerRequested(opensAt: pending.opensAt), essential: true)
         await load(orderId: orderID, speakChanges: false)
     }
 
@@ -114,9 +114,9 @@ extension VolunteerInServiceViewModel {
             locationFailureReason: locationFailureReason
         )
         if outcome.isFailure {
-            speechService?.speakError(outcome.message)
+            speechService?.speakError(outcome.message, essential: true)
         } else {
-            speechService?.speak(outcome.message)
+            speechService?.speak(outcome.message, essential: true)
         }
         // 确定一个字节都没发：弹本地拨号兜底（#407 第 1 项）。先等确认框 / 求助面板收起 —— 立刻失败（没同意共享位置、
         // 登录过期）时同一拍里又弹一个对话框，iOS 16 会丢掉其中一个，只剩播报。
@@ -135,11 +135,11 @@ extension VolunteerInServiceViewModel {
         )
         isAcknowledgingEmergency = false
         if succeeded {
-            speechService?.speak(EmergencySafetyCopy.volunteerAcknowledged)
+            speechService?.speak(EmergencySafetyCopy.volunteerAcknowledged, essential: true)
         } else {
             let message = "确认失败，请重试。若情况危急请立即拨打120或110。"
             errorMessage = message
-            speechService?.speakError(message)
+            speechService?.speakError(message, essential: true)
         }
     }
 }

@@ -49,6 +49,8 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     /// 「此刻是不是在通话中」。默认走 CallKit，**测试可以替换**——
     /// 单测里真的去打一通电话是做不到的，而「通话中只保留警示」是一条必须能回归的规则。
     nonisolated(unsafe) var isCallActive: () -> Bool = { CallStateMonitor.shared.hasActiveCall }
+    /// 陪跑员关了 App 语音时为真（`VolunteerVoicePreference`）。默认照念。
+    nonisolated(unsafe) var isRoutineSpeechSilenced: () -> Bool = { false }
 
     override init() {
         super.init()
@@ -94,10 +96,17 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     /// `priority` **带默认值，既有调用点一行都不用改**：全仓 230 个 `speak` / `speakError` /
     /// `announce` 分布在 31 个文件里，改签名会把整个仓库碰一遍。默认档与同档打断的取法
     /// 见 `AnnouncementPriority` —— 不传优先级时的行为与本次改动之前**逐字相同**。
-    func speak(text: String, priority: AnnouncementPriority = .counterpartAction) {
+    ///
+    /// `essential`：陪跑员关了语音也要念（安全提醒、用户自己点的朗读）。
+    func speak(text: String, priority: AnnouncementPriority = .counterpartAction, essential: Bool = false) {
         let normalizedText = text.trimmed
         guard !normalizedText.isEmpty else { return }
         clearStaleUtteranceIfNeeded()
+        // 静音挡在入队之前：进了队列会打断或顶掉要照念的那句。通告照发；有话正在念时让读屏排在它后面。
+        if !essential, priority < .alert, isRoutineSpeechSilenced() {
+            if !isCallActive() { postVoiceOverAnnouncement(normalizedText, queued: currentPriority != nil) }
+            return
+        }
         let announcement = PendingAnnouncement(
             text: normalizedText, priority: priority, enqueuedAt: Date()
         )
@@ -110,8 +119,8 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     }
 
     /// 兼容既有调用点的短方法名。
-    func speak(_ text: String, priority: AnnouncementPriority = .counterpartAction) {
-        speak(text: text, priority: priority)
+    func speak(_ text: String, priority: AnnouncementPriority = .counterpartAction, essential: Bool = false) {
+        speak(text: text, priority: priority, essential: essential)
     }
 
     /// 真正把一条送进合成器。**只有这里能写 `lastSpokenText` / `latestRepeatableText`。**
@@ -205,7 +214,7 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
 
     /// 重复播报当前状态（"重复当前状态"按钮调用）
     func repeatCurrentStatus() {
-        speak(text: latestRepeatableText ?? "当前没有进行中的订单。")
+        speak(text: latestRepeatableText ?? "当前没有进行中的订单。", essential: true)
     }
 
     /// 播报错误信息。
@@ -225,8 +234,8 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     /// 换成这里**不是**因为那样有错 —— 当时误判了一条 flaky 用例的归因，
     /// 复跑后证明与 `didSet` 无关。改用方法 funnel 纯粹因为它更简单：
     /// 不碰属性观察器，且语义正好落在「刚念出一条错误」上，顺带覆盖了求助之外的全部错误播报。
-    func speakError(_ message: String, priority: AnnouncementPriority = .counterpartAction) {
-        speak(text: message, priority: priority)
+    func speakError(_ message: String, priority: AnnouncementPriority = .counterpartAction, essential: Bool = false) {
+        speak(text: message, priority: priority, essential: essential)
         HapticFeedback.play(.error)
     }
 
@@ -285,12 +294,15 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
         }
     }
 
-    private func postVoiceOverAnnouncement(_ text: String) {
+    private func postVoiceOverAnnouncement(_ text: String, queued: Bool = false) {
         let normalizedText = text.trimmed
         guard !normalizedText.isEmpty else { return }
         lastVoiceOverAnnouncement = normalizedText
         let post = {
-            UIAccessibility.post(notification: .announcement, argument: normalizedText)
+            let argument = NSAttributedString(
+                string: normalizedText, attributes: [.accessibilitySpeechQueueAnnouncement: queued]
+            )
+            UIAccessibility.post(notification: .announcement, argument: argument)
         }
         if Thread.isMainThread {
             post()

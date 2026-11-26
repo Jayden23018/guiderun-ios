@@ -352,7 +352,8 @@ final class PushNotificationsManager: NSObject, ObservableObject, UNUserNotifica
         guard appState?.isLoggedIn == true else { return }
         // 冷启动点开推送时会话恢复前没有 userId，入口那道比对放行了；恢复完再比一次（backend#1018）。
         guard PushRecipientGate.isForCurrentUser(userInfo, currentUserId: appState?.userId) else { return }
-        speechService?.speak(text)
+        let eventType = userInfo["eventType"] as? String ?? ""
+        speechService?.speak(text, essential: AppRealtimeCoordinator.keepsVolunteerSpeech(forEventType: eventType))
     }
 
     /// 播报文案优先 `ttsText`（后端为盲人用户单独写的口播版本），退化到通知正文。

@@ -433,7 +433,7 @@ struct ContentView: View {
         .onChange(of: rootRouter.route) { route in
             MainRunLoopWatchdog.shared.setPageCategory(route.diagnosticCategory)
         }
-        .modifier(SessionLifecycleStatusModifier()).modifier(DispatchProgressAnnouncer(coordinator: appState.realtimeCoordinator)) // #949
+        .modifier(SessionLifecycleStatusModifier()).modifier(DispatchProgressAnnouncer(coordinator: appState.realtimeCoordinator)).modifier(VolunteerVoiceGate()) // #949
         // 交给自己订阅协调器的子视图（#1028）：ContentView 只订阅 AppState，横幅变成「没有」时不会重画。
         .overlay(alignment: .top) { RealtimeForegroundNotificationOverlay(coordinator: appState.realtimeCoordinator) }
         .onReceive(appState.realtimeCoordinator.$currentNotification.compactMap { $0 }) { notification in
@@ -442,14 +442,14 @@ struct ContentView: View {
             // identity gate, the recreated subscription immediately replays the same
             // notification and forms a main-thread render/TTS feedback loop.
             guard notificationAnnouncementGate.accepts(notification.id) else { return }
-            speechService.speak(notification.speechText, priority: notification.announcementPriority)
+            speechService.speak(notification.speechText, priority: notification.announcementPriority, essential: notification.keepsVolunteerSpeech)
         }
         .onReceive(appState.liveEscortCoordinator.$healthState.removeDuplicates()) { state in
             // removeDuplicates only applies within one subscription. SwiftUI may
             // recreate the subscription after any environment-object publication,
             // so retain the last handled value in view state across subscriptions.
             guard healthAnnouncementGate.accepts(state) else { return }
-            if let message = state.userMessage { speechService.speak(message) }
+            if let message = state.userMessage { speechService.speak(message, essential: state.isDegraded) }
         }
         // 跑步中登录过期、暂缓退出（#376）。进入时念横幅全文，之后限频补念短句（序号由 `AppState` 递增）。
         .onReceive(appState.$sessionExpiryDeferral) { deferral in
@@ -458,7 +458,7 @@ struct ContentView: View {
             if let deferral {
                 speechService.speak(
                     deferral.spokenMessage,
-                    priority: deferral.announcementSerial <= 1 ? .emergency : .counterpartAction
+                    priority: deferral.announcementSerial <= 1 ? .emergency : .counterpartAction, essential: true
                 )
             }
         }
