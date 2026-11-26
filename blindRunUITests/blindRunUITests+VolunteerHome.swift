@@ -149,14 +149,15 @@ extension blindRunUITests {
         // 会把这条用例变成在验别的东西。
         app.descendants(matching: .any)["volunteerDispatchDetailButton"].firstMatch.tap()
 
+        // 按头卡的标识符认「订单页弹出来了」：邀请卡上没有这个标识符。
         XCTAssertTrue(
-            app.staticTexts["陪跑邀请"].firstMatch.waitForExistence(timeout: 10),
+            app.descendants(matching: .any)["volunteerOrderFlowStatusCard"].firstMatch.waitForExistence(timeout: 10),
             "从邀请卡（自定义 overlay）里应当能再弹出完整订单页（fullScreenCover）\n\(app.debugDescription)"
         )
-        // 引导绳停在第 1 步（v2 用绳子代替了四步进度条）。按前缀认：标签自 #399 起接着「。接下来：…」，精确匹配从那时就红。
+        // 停在第 1 步：竖时间轴把后面 3 步收成一行（订单页改版后没有引导绳了）。
         XCTAssertTrue(
-            app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "第 1 步，共 4 步，邀请，还没约好")).firstMatch.exists,
-            "详情页应当停在四步骨架的第 1 步\n\(app.debugDescription)"
+            app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "后面还有 3 步")).firstMatch.exists,
+            "详情页应当停在四步的第 1 步\n\(app.debugDescription)"
         )
 
         app.buttons["返回"].firstMatch.tap()
