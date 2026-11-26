@@ -77,12 +77,12 @@ extension AccessibilityAuditTests {
         element(app, "blindRunnerHomeStartBookingButton").tap()
         XCTAssertTrue(waitForBookingScreen(app), "约跑页没起来")
 
-        // 约跑页（#806）进来默认是「当前位置」，点「常用地点」才用首页设的默认地点。
-        // 按标签找：根视图的 identifier 盖掉了子元素的（#814）。
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "常用地点")).firstMatch.tap()
+        // 约跑页（v5 #821 起）进页就选中首页设的默认出发地点，不用再点（#905）。
         // 断约跑页上那句「家附近操场 · 见面点电话里再定」，不会被首页那行「从家附近操场出发」误判通过。
-        let place = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "家附近操场 · ")).firstMatch
-        XCTAssertTrue(place.waitForExistence(timeout: 10), "约跑页选「常用地点」后没用上首页设的默认地点")
+        // 按标签找：根视图的 identifier 盖掉了子元素的（#814）。
+        let place = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "家附近操场 · ")).firstMatch
+        XCTAssertTrue(place.waitForExistence(timeout: 10), "约跑页进页没用上首页设的默认地点")
         keepScreenshot(app, "idle-booking-with-default")
     }
 

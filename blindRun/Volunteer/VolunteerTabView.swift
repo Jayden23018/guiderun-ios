@@ -120,7 +120,9 @@ struct VolunteerTabView: View {
             if orderId != nil { selection = .home }
         }
         // #520：开着接单开关、精确位置却关着时，派单位置已停报 —— 顶部说清原因、念一次、申请临时精确位置。
-        .dispatchPreciseLocationNotice(isDispatching: viewModel.isAvailable)
+        // 陪跑进行中不挂（#745）：这条用 `safeAreaInset` 挂在根上，跑步页的自定义顶栏不让位，
+        // 真机上它盖住了「返回」和「求助」；那时也不派新单，这句话不相干。
+        .dispatchPreciseLocationNotice(isDispatching: viewModel.isAvailable && !viewModel.isEscortUnderway)
         // 「隐私与授权」撤回位置同意时要关掉同一个接单开关（#530），所以把首页 view model 往下传。
         .environmentObject(viewModel)
         // #521：第一次打开接单开关时先说明用途再问通知权限（邀请靠推送）。精确位置关着时先让上面那条说完。
