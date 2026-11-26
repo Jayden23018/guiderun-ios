@@ -95,10 +95,11 @@ extension APIError {
 /// 断网类失败先自己重试几次，都不成功才报错（2026-11-26 负责人定）。
 ///
 /// 起因：陪跑员点「陪跑员认证」时手机断网约一分钟，App 一次没重试就整页换成「暂时无法恢复账号资料」。
-/// 只重试能在原地好起来的失败：断网、连不上服务器、超时、连接中途断开（`.networkError`）。
-/// - 证书错误重试也不会好，不重试。
+/// 只重试能在原地好起来的失败：`.networkError` 且底层是 `retryableCodes` 里的 URLError（白名单）。
+/// - 证书错误、`badURL` 这类重试也不会好，不重试。
 /// - 服务端回了答复（401、4xx、5xx、解码失败）交给调用方原来的分支，不重试。
-/// - 取消立刻抛出：根路由换页时会取消旧的加载，不能还在后台等。
+/// - 取消立刻抛出：根路由换页时会取消旧的加载，不能还在后台等。换了账号时 `URLSessionAPIClient`
+///   抛的是 `.networkError(CancellationError())`，也不重试：不能拿新会话重发旧请求。
 ///
 /// 用在冷启动校验会话（`restoreSession`）和根路由加载资料（`ContentRootRouter.hydrate`，
 /// 含陪跑员注册状态：它的 `try?` 降级判定可能把已完成注册的人送回认证页，所以断网时也先重试）。
@@ -127,7 +128,15 @@ enum TransientNetworkRetry {
 
     static func isTransient(_ error: Error) -> Bool {
         guard case .networkError(let underlying)? = error as? APIError else { return false }
-        if (underlying as? URLError)?.code == .cancelled { return false }
-        return APIError.networkFailureKind(underlying) != .secureConnection
+        let nsError = underlying as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        return retryableCodes.contains(URLError.Code(rawValue: nsError.code))
     }
+
+    /// 断网、蜂窝数据被关、超时、连接中途断开、找不到或连不上服务器。
+    private static let retryableCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff,
+        .timedOut, .networkConnectionLost,
+        .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed
+    ]
 }

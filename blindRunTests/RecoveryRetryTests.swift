@@ -72,6 +72,9 @@ final class RecoveryRetryTests: XCTestCase {
 
         XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.networkError(URLError(.serverCertificateUntrusted))))
         XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.networkError(URLError(.cancelled))))
+        // 换了账号时 `URLSessionAPIClient` 抛的就是这个：不能拿新会话重发旧请求。
+        XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.networkError(CancellationError())))
+        XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.networkError(URLError(.badURL))))
         XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.unauthorized))
         XCTAssertFalse(TransientNetworkRetry.isTransient(APIError.unknown(statusCode: 503)))
         XCTAssertFalse(TransientNetworkRetry.isTransient(CancellationError()))
@@ -130,13 +133,16 @@ final class RecoveryRetryTests: XCTestCase {
     }
 
     /// 不在失败页时回到前台：不发请求。否则每次切回 App 都会重校验一遍会话。
+    /// 会话状态故意是「校验失败」：去掉路由判断的实现会走 `retryRecovery` 重新校验，`meCalls` 就会变。
     func testForegroundDoesNothingWhenNotOnTheFailurePage() async {
-        let (appState, client, persistence) = Self.makeStoredSession(failingMeCalls: 0)
+        let (appState, client, persistence) = Self.makeStoredSession(failingMeCalls: 100)
         defer { persistence.reset() }
-        // 不调 `synchronize`：它会在后台拉资料，本客户端让资料加载失败，路由可能自己跳到失败页。
-        // 路由停在初始的 `.restoringAccount`，正好是「不在失败页」。
+        // 不调 `synchronize`：路由停在初始的 `.restoringAccount`，也就是「不在失败页」。
         let router = ContentRootRouter()
         await appState.restoreSession()
+        guard case .validationFailed = appState.sessionRestorationState else {
+            return XCTFail("前提：会话校验失败，实际 \(appState.sessionRestorationState)")
+        }
         let callsAfterLaunch = client.meCalls
 
         await router.retryRecoveryIfFailed(with: appState)
