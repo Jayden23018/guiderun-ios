@@ -89,11 +89,14 @@ extension VolunteerVoicePreferenceTests {
 
     func testSilencedVolunteerHearsThatTheEmergencyWasNotSent() async {
         let speech = makeSilencedSpeech()
-        let viewModel = makePage(makeVolunteerAppState(), speech)
+        // 页面对 AppState 是弱引用：不在本地持有，真机上它当场被释放，页面在 guard 处提前返回。
+        let appState = makeVolunteerAppState()
+        let viewModel = makePage(appState, speech)
 
         await viewModel.enterEmergency(locate: { nil }, locationFailureReason: { .preciseLocationOff })
 
         XCTAssertEqual(speech.spokenHistoryForTesting.count, 1)
+        appState.emergencyCoordinator.reset()
     }
 
     func testSilencedVolunteerHearsThatTheEmergencyWasSent() async {
@@ -124,11 +127,14 @@ extension VolunteerVoicePreferenceTests {
                 )
             }
             let speech = makeSilencedSpeech()
-            let viewModel = makePage(makeVolunteerAppState(safety: safety), speech)
+            // 页面对 AppState 是弱引用：不在本地持有，真机上它当场被释放，页面在 guard 处提前返回。
+            let appState = makeVolunteerAppState(safety: safety)
+            let viewModel = makePage(appState, speech)
 
             await viewModel.acknowledgeEmergency(eventID: 77)
 
             XCTAssertEqual(speech.spokenHistoryForTesting.count, 1, "succeeds=\(succeeds)")
+            withExtendedLifetime(appState) {}
         }
     }
 
@@ -149,11 +155,13 @@ extension VolunteerVoicePreferenceTests {
             delivered: false
         ))
         let speech = makeSilencedSpeech()
-        let viewModel = makePage(makeVolunteerAppState(orders: orders), speech)
+        let appState = makeVolunteerAppState(orders: orders)
+        let viewModel = makePage(appState, speech)
 
         await viewModel.ringRunner()
 
         XCTAssertEqual(speech.spokenHistoryForTesting, ["对方可能没收到，可以打电话。"])
+        withExtendedLifetime(appState) {}
     }
 
     /// 证书页进页和上传后的自动播报要静音，只有「重复当前状态」照念。
