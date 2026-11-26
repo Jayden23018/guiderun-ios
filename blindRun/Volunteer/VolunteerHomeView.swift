@@ -134,7 +134,8 @@ struct VolunteerHomeView: View {
     /// 都不在首页上。已经开启时点按胶囊只做后一件。
     private var availabilityCTA: some View {
         let status = viewModel.availabilityStatus
-        let isEnabled = status.allowsOpening(isRegistrationComplete: appState.isVolunteerProfileApproved)
+        let isRegistrationComplete = appState.isVolunteerProfileApproved
+        let isEnabled = status.allowsOpening(isRegistrationComplete: isRegistrationComplete)
         // v3（#694）：白色底座里一枚胶囊，替换改版前那条饱和绿色通栏。取值照样例
         // （底座圆角 24、内边距 8、左右各留 16）。
         return VStack(alignment: .leading, spacing: 8) {
@@ -149,7 +150,9 @@ struct VolunteerHomeView: View {
                         status: .parse(appState.volunteerProfile?.verificationStatus),
                         statusLoadFailed: false
                     ),
-                    isAlternativeIdentityPath: appState.volunteerRegistrationStatus?.hasDeclinedFaceVerification == true
+                    isAlternativeIdentityPath: appState.volunteerRegistrationStatus?.hasDeclinedFaceVerification == true,
+                    isAvailable: viewModel.isAvailable,
+                    isRegistrationComplete: isRegistrationComplete
                 ),
                 statusText: viewModel.statusText,
                 onChange: { viewModel.setAvailability($0) },

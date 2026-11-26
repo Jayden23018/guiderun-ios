@@ -85,6 +85,32 @@ final class VolunteerProfileFirstScreenTests: XCTestCase {
         }
     }
 
+    /// 关着又滑不开时，滑块必须换成说明原因的胶囊，不能是一条静默失效的滑块。
+    ///
+    /// 🚩 关键输入是 `isAvailable: false, isEnabled: false, blocksOpening: false`（注册状态没同步完）：
+    /// 只认 `blocksOpening` 的旧实现在这里给 false，陪跑员滑了没反应、也没有一个字。
+    func testASliderThatCannotOpenIsAlwaysReplacedByAnExplanation() {
+        XCTAssertTrue(
+            VolunteerAvailabilitySlide.showsBlockedEntry(isAvailable: false, isEnabled: false, blocksOpening: false),
+            "滑不开却仍画滑块 —— 陪跑员滑了没反应，也不知道为什么"
+        )
+        XCTAssertTrue(VolunteerAvailabilitySlide.showsBlockedEntry(isAvailable: false, isEnabled: false, blocksOpening: true))
+        XCTAssertTrue(VolunteerAvailabilitySlide.showsBlockedEntry(isAvailable: true, isEnabled: false, blocksOpening: true))
+        // 能滑开的人照常看到滑块；开着的人走「接单中」胶囊，不被说成「暂不能接单」。
+        XCTAssertFalse(VolunteerAvailabilitySlide.showsBlockedEntry(isAvailable: false, isEnabled: true, blocksOpening: false))
+        XCTAssertFalse(VolunteerAvailabilitySlide.showsBlockedEntry(isAvailable: true, isEnabled: false, blocksOpening: false))
+    }
+
+    /// 在「暂不能接单」胶囊上向右滑要有回应；轻微抖动和向左滑不算。
+    func testOnlyARealRightwardSwipeOnTheBlockedPillCountsAsAnAttempt() {
+        let minimum = VolunteerAvailabilitySlide.blockedSwipeMinimum
+        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum))
+        XCTAssertTrue(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: 200))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: minimum - 1))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: -200))
+        XCTAssertFalse(VolunteerAvailabilitySlide.isBlockedOpenAttempt(dragX: .nan))
+    }
+
     // MARK: - 主指标
 
     /// 🔴 新人不显示「0 次陪跑」——一屏上最大最粗的那个数字是 0，那是负激励。
