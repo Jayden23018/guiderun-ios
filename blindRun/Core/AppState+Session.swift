@@ -23,7 +23,8 @@ extension AppState {
         mockAPIClient.syncSessionFromAppState(token: accessToken, role: activeRole)
         do {
             // 未包会话处理的那份（#872）：下面 `.unauthorized` 分支自己清会话、写「登录状态已失效」。
-            let user = try await sessionUnawareAuth.currentUser()
+            // 断网类失败先自己重试几次，都不成功才落到恢复失败页（`TransientNetworkRetry`）。
+            let user = try await TransientNetworkRetry.run { try await sessionUnawareAuth.currentUser() }
             guard user.roleResolution != .invalid else {
                 performLocalSessionCleanup()
                 sessionExpirationMessage = "登录角色信息异常，请重新登录。"
