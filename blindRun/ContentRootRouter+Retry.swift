@@ -1,4 +1,20 @@
 import Foundation
+import SwiftUI
+
+/// 回到前台时调 `retryRecoveryIfFailed`。挂在 `ContentView` 根上（单独一个 modifier：
+/// `ContentView` 的文件长度被 SwiftLint 闸冻结，只许变小）。
+struct RecoveryRetryOnForeground: ViewModifier {
+    let router: ContentRootRouter
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task { await router.retryRecoveryIfFailed(with: appState) }
+        }
+    }
+}
 
 extension ContentRootRouter {
     /// 启动恢复失败页的「重试恢复」（#573）。
@@ -21,5 +37,12 @@ extension ContentRootRouter {
         case .unauthenticated, .choosingRole, .authenticated:
             synchronize(with: appState)
         }
+    }
+
+    /// 回到前台时调：停在恢复失败页就先自己重试一次，不等人点（2026-11-26 负责人定）。
+    /// 多半是切到后台时断了网，回来时网已经好了。别的页面什么都不做。
+    func retryRecoveryIfFailed(with appState: AppState) async {
+        guard case .recoveryFailed = route else { return }
+        await retryRecovery(with: appState)
     }
 }

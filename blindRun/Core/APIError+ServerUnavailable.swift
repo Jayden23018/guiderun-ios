@@ -91,3 +91,52 @@ extension APIError {
         .timedOut, .networkConnectionLost
     ]
 }
+
+/// 断网类失败先自己重试几次，都不成功才报错（2026-11-26 负责人定）。
+///
+/// 起因：陪跑员点「陪跑员认证」时手机断网约一分钟，App 一次没重试就整页换成「暂时无法恢复账号资料」。
+/// 只重试能在原地好起来的失败：`.networkError` 且底层是 `retryableCodes` 里的 URLError（白名单）。
+/// - 证书错误、`badURL` 这类重试也不会好，不重试。
+/// - 服务端回了答复（401、4xx、5xx、解码失败）交给调用方原来的分支，不重试。
+/// - 取消立刻抛出：根路由换页时会取消旧的加载，不能还在后台等。换了账号时 `URLSessionAPIClient`
+///   抛的是 `.networkError(CancellationError())`，也不重试：不能拿新会话重发旧请求。
+///
+/// 用在冷启动校验会话（`restoreSession`）和根路由加载资料（`ContentRootRouter.hydrate`，
+/// 含陪跑员注册状态：它的 `try?` 降级判定可能把已完成注册的人送回认证页，所以断网时也先重试）。
+enum TransientNetworkRetry {
+    /// 第 1 次失败后等 1 秒、第 2 次失败后等 2 秒，一共试 3 次。
+    /// 单次请求超时是 15 秒（`URLSessionAPIClient`），全超时最坏约 48 秒，期间页面显示「正在恢复账号资料」。
+    static let defaultDelaysNanoseconds: [UInt64] = [1_000_000_000, 2_000_000_000]
+
+    /// 实际用的间隔。只有单测改它（改成 0，不真等），改完要在 `tearDown` 还原。
+    static var delaysNanoseconds = defaultDelaysNanoseconds
+
+    static func run<T>(
+        delaysNanoseconds: [UInt64] = delaysNanoseconds,
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        var remainingDelays = delaysNanoseconds[...]
+        while true {
+            do {
+                return try await operation()
+            } catch {
+                guard isTransient(error), !Task.isCancelled, let delay = remainingDelays.popFirst() else { throw error }
+                try await Task.sleep(nanoseconds: delay)
+            }
+        }
+    }
+
+    static func isTransient(_ error: Error) -> Bool {
+        guard case .networkError(let underlying)? = error as? APIError else { return false }
+        let nsError = underlying as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        return retryableCodes.contains(URLError.Code(rawValue: nsError.code))
+    }
+
+    /// 断网、蜂窝数据被关、超时、连接中途断开、找不到或连不上服务器。
+    private static let retryableCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff,
+        .timedOut, .networkConnectionLost,
+        .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed
+    ]
+}
