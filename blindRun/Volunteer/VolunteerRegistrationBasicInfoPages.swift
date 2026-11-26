@@ -251,13 +251,15 @@ struct VolunteerRegistrationBasicInfoBottomBar: View {
             NavigationLink {
                 LegalFallbackDocumentView(document: purpose.checkboxDocument, footer: { EmptyView() })
             } label: {
-                Text("《\(documentTitle)》")
+                // 末尾补窄空格：以全角「》」收尾的字，真机审计报 Text clipped（字是完整的）。读屏用原串。
+                Text("《\(documentTitle)》\u{202F}")
                     .font(.callout)
                     .foregroundColor(AppColors.primary)
                     .multilineTextAlignment(.leading)
                     .frame(minHeight: AppTouchTarget.minimum)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel("《\(documentTitle)》")
             .accessibilityHint("查看授权全文")
             .accessibilityIdentifier("volunteerIdentityConsentDocumentLink")
         }

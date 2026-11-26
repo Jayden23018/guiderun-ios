@@ -46,7 +46,7 @@ extension AccessibilityAuditTests {
     /// 取消固定搭档每次都先确认（负责人 2026-11-05 定）。
     ///
     /// 改版前没退出过的搭档点了直接取消 —— 把 `BlindPartnerDetailView` 的确认绕掉（直接 `perform(false)`），
-    /// 第二段「弹窗出现」那一句就红。已退出那一档要用长文案：换成短文案的话「不作数」那一句红。
+    /// 第二段「弹窗出现」那一句就红。已退出那一档要说明对方已退出：换成没退出的那套文案，「已退出固定搭档」那一句红。
     @MainActor
     func testBlindPartnerDetailConfirmsEveryRemoval() throws {
         let app = launchBlindHome(emptyOrders: false)
@@ -62,8 +62,8 @@ extension AccessibilityAuditTests {
         var alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 5), "对方已退出时取消要先确认")
         XCTAssertTrue(
-            alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "不作数")).firstMatch.exists,
-            "对方已退出时要警告会撤销他的退出"
+            alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "已退出固定搭档")).firstMatch.exists,
+            "对方已退出时，确认框要说明这一点"
         )
         alert.buttons["保留收藏"].tap()
         app.navigationBars.buttons.firstMatch.tap()

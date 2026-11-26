@@ -3,7 +3,7 @@ import XCTest
 /// 单独成文件：`blindRunUITests.swift` 已超长，SwiftLint 棘轮不许它再变长。
 extension blindRunUITests {
     /// #500：按下求助后屏 3b（「求助已发出」）弹出；返回跑步后再按一次，被后端并进未结案的那条时**重新弹出**，
-    /// 并在屏上写出「这次没有新建求助」那句（念的那一路由单测
+    /// 并在屏上写出「上一次求助还在处理中」那句（#958 把文案改短过；念的那一路由单测
     /// `EmergencyUITestLocationSeamTests.testMergedRetriggerThroughTheCountdownEntryAnnouncesNoNewRequest` 守）。
     ///
     /// 两次弹出各靠 `EmergencyRecoveryPresentation` 的一个 `onChange`：第一次是事件 id 从无到有，
@@ -51,9 +51,9 @@ extension blindRunUITests {
         sendSOSThroughSafetyHub(app)
         XCTAssertTrue(sentScreen.waitForExistence(timeout: 10), "再按一次被合并时屏 3b 没有重新弹出")
         let mergedLine = sentScreen.staticTexts.containing(
-            NSPredicate(format: "label BEGINSWITH %@", "这次没有新建求助")
+            NSPredicate(format: "label BEGINSWITH %@", "上一次求助还在处理中")
         ).firstMatch
-        XCTAssertTrue(mergedLine.waitForExistence(timeout: 5), "屏 3b 上没有说清「这次没有新建求助」")
+        XCTAssertTrue(mergedLine.waitForExistence(timeout: 5), "屏 3b 上没有说清「上一次求助还在处理中」")
         attachSentScreenShot("sos-sent-merged")
     }
 
