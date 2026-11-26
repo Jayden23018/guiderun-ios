@@ -53,7 +53,7 @@ extension AppRealtimeCoordinator {
             speechText: speechText,
             priority: Self.clientPriority(forEventType: eventType, serverPriority: message.priority),
             timestamp: message.timestamp,
-            isSafetyEvent: Self.isSafetyEventType(eventType)
+            isSafetyEvent: Self.isSafetyEventType(eventType), keepsVolunteerSpeech: Self.keepsVolunteerSpeech(forEventType: eventType)
         )
         if let status = Self.lifecycleStatus(forEventType: eventType),
            deferOrSuppressLifecycleNotification(status: status, orderID: message.orderId, notification: notification, type: message.type) {

@@ -43,7 +43,7 @@ extension AppRealtimeCoordinator {
                     timestamp: missed.sentAt,
                     // 补读同样按类型判呈现强度。断线期间错过的 `REMATCHING_MID_RUN` 是这批里
                     // 最该被听见的一条 —— 它意味着盲人当时已经独自在户外，而他到现在都不知道。
-                    isSafetyEvent: Self.isSafetyEventType(eventType)
+                    isSafetyEvent: Self.isSafetyEventType(eventType), keepsVolunteerSpeech: Self.keepsVolunteerSpeech(forEventType: eventType)
                 ),
                 type: WSMessageType.appNotification.rawValue
             )

@@ -204,6 +204,8 @@ struct VolunteerSettingsView: View {
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, minHeight: GroupedCardMetrics.rowMinHeight, alignment: .leading)
             GroupedCardDivider()
+            VolunteerAppVoiceRow() // backend#1064
+            GroupedCardDivider()
             VolunteerHelpSettingsLink() // #656：第一次打开订单页会自动弹一次，这里是随时回看的入口
             GroupedCardDivider()
             NavigationLink {

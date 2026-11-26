@@ -244,7 +244,7 @@ struct VolunteerCertificateStatusActions: View {
             }
 
             Button {
-                viewModel.announceCurrentStatus()
+                viewModel.announceCurrentStatus(essential: true)
             } label: {
                 VolunteerAccountActionRowLabel(
                     title: "重复当前状态",

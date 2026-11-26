@@ -71,7 +71,7 @@ extension VolunteerInServiceViewModel {
         guard delivered != false else {
             let message = "对方可能没收到，可以打电话。"
             nudgeNotice = message
-            speechService?.speakError(message)
+            speechService?.speakError(message, essential: true)
             return
         }
         nudgeNotice = nil
@@ -92,7 +92,7 @@ extension VolunteerInServiceViewModel {
             message = "没有发出去，请重试。"
         }
         nudgeNotice = message
-        speechService?.speakError(message)
+        speechService?.speakError(message, essential: true)
     }
 
     /// 跑者位置。新鲜度（15 秒）、单号与 GCJ-02 边界都由订单跟踪判过（`PeerLocationFreshness`），

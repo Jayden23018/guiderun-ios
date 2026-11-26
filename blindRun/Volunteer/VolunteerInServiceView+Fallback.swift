@@ -158,7 +158,7 @@ extension VolunteerInServiceView {
         ScrollView {
             if let track = trackViewModel.track {
                 CompletedTrackSummaryView(track: track, recordOrderId: orderId, role: .volunteer) {
-                    speechService.speak(track.spokenSummary)
+                    speechService.speak(track.spokenSummary, essential: true)
                 }
                 .padding(20)
                 .readableContentColumn()
@@ -191,7 +191,7 @@ extension VolunteerInServiceView {
                     .accessibilityIdentifier("volunteerCompletedTrackRetry")
 
                     Button {
-                        speechService.speak("服务已完成。\(message)")
+                        speechService.speak("服务已完成。\(message)", essential: true)
                     } label: {
                         Text("重复当前状态")
                     }

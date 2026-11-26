@@ -34,7 +34,7 @@ private struct VolunteerFindMeRingModifier: ViewModifier {
     private func configure() {
         let speech = speechService
         let coordinator = appState.realtimeCoordinator
-        ringController.speak = { speech.speak($0) }
+        ringController.speak = { speech.speak($0, essential: true) }
         ringController.isSpeaking = { speech.isSpeaking }
         ringController.onFinish = { coordinator.dismissRunnerRing() }
         #if DEBUG

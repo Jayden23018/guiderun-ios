@@ -80,7 +80,9 @@ extension AccessibilityAuditTests {
     private func checkSettingsList(_ app: XCUIApplication, variant: String) throws {
         let achievements = app.buttons["volunteerProfileAchievementsCard"].firstMatch
         let about = app.buttons["关于"].firstMatch
+        let appVoice = app.switches["volunteerAppVoiceToggle"].firstMatch
         let listEntries = [
+            appVoice,
             achievements,
             app.buttons["supportTicketSettingsEntry"].firstMatch,
             app.buttons["mySupportTicketsSettingsEntry"].firstMatch,
@@ -93,6 +95,7 @@ extension AccessibilityAuditTests {
             XCTAssertTrue(entry.exists, "\(variant)：「我的」列表缺一项：\(entry)")
         }
         XCTAssertTrue(achievements.label.hasPrefix("服务成就"), "列表第一行是服务成就：\(achievements.label)")
+        XCTAssertEqual(appVoice.value as? String, "0", "App 语音播报默认关（backend#1064）")
         attachScreenshot(app, name: "volunteer-settings-\(variant)-bottom")
         // 上推之后「类别」和第一排方块滚到了导航栏的模糊区里，看不见（#700）。
         try audit(app, contentScrolledUnderNavigationBar: true)

@@ -67,7 +67,7 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
             .onChange(of: coordinator.volunteerAlert?.eventID) { eventID in
                 // 收起时念一句，不悄悄消失；退出登录、切换角色时（`reset()`）不念。
                 if eventID == nil, shownAlertEventID != nil, appState.isLoggedIn, appState.activeRole == .volunteer {
-                    speechService.speak(EmergencySafetyCopy.volunteerAlertCleared)
+                    speechService.speak(EmergencySafetyCopy.volunteerAlertCleared, essential: true)
                 }
                 shownAlertEventID = eventID
             }
@@ -94,9 +94,9 @@ struct VolunteerGlobalEmergencyAlert: ViewModifier {
         let succeeded = await coordinator.acknowledgeAsVolunteer(eventID: eventID, safety: appState.safety)
         presenter.isAcknowledging = false
         if succeeded {
-            speechService.speak(EmergencySafetyCopy.volunteerAcknowledged)
+            speechService.speak(EmergencySafetyCopy.volunteerAcknowledged, essential: true)
         } else {
-            speechService.speakError(Self.acknowledgeFailure)
+            speechService.speakError(Self.acknowledgeFailure, essential: true)
         }
     }
 }

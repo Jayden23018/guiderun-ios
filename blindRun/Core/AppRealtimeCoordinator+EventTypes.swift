@@ -205,6 +205,8 @@ struct RealtimeForegroundNotification: Identifiable, Sendable {
     let priority: RealtimePriority
     let timestamp: String?
     let isSafetyEvent: Bool
+    /// 陪跑员关了 App 语音也要念（`keepsVolunteerSpeech(forEventType:)`）。安全档本来就念，这里补它覆盖不到的类型。
+    var keepsVolunteerSpeech = false
 
     /// 安全通知走警示档：轮询念的通用句切不断它，通话中也照播（#653）。其余通知保持默认档。
     var announcementPriority: AnnouncementPriority {

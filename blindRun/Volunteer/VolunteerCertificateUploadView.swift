@@ -398,8 +398,8 @@ final class VolunteerCertificateUploadViewModel: ObservableObject {
         }
     }
 
-    func announceCurrentStatus() {
-        speechService?.speak(statusAnnouncement)
+    func announceCurrentStatus(essential: Bool = false) {
+        speechService?.speak(statusAnnouncement, essential: essential)
     }
 
     // MARK: - Status
