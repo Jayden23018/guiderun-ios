@@ -62,6 +62,26 @@ enum VolunteerAvailabilitySlide {
         guard !isUpdating else { return false }
         return isAvailable || isEnabled
     }
+
+    /// 该不该把滑块换成「暂不能接单 · 原因」那枚胶囊。
+    ///
+    /// 🔴 **关着又滑不开时一律换成胶囊，不许留一条半透明、吞手势、没有字的滑块。**
+    /// 此前只认资质 / 培训 / 停用三态（`blocksOpening`）；注册状态没同步到「已完成」时
+    /// `isEnabled` 也为假，滑块就静默失效，陪跑员滑了没反应、也不知道为什么。
+    static func showsBlockedEntry(isAvailable: Bool, isEnabled: Bool, blocksOpening: Bool) -> Bool {
+        blocksOpening || (!isAvailable && !isEnabled)
+    }
+
+    /// 在「暂不能接单」胶囊上向右滑，算不算一次想开启的尝试。
+    ///
+    /// 被挡住时胶囊只响应点按；陪跑员按习惯去滑，什么都不发生，等于没有提醒。
+    /// 向右滑过这么多、且横向为主，就当作点按：震一下警示，打开接单前进度。
+    /// 横向为主是为了让从胶囊上起手、略带右偏的上下滚动不被误判成「想开启」。
+    static let blockedSwipeMinimum: CGFloat = 24
+
+    static func isBlockedOpenAttempt(dragX: CGFloat, dragY: CGFloat) -> Bool {
+        dragX.isFinite && dragY.isFinite && dragX >= blockedSwipeMinimum && dragX > abs(dragY)
+    }
 }
 
 
@@ -121,7 +141,7 @@ struct VolunteerAvailabilitySlider: View {
 
     var body: some View {
         Group {
-            if isAvailable || status.blocksOpening {
+            if isAvailable || isBlocked {
                 entryPill
             } else {
                 slideTrack
@@ -129,7 +149,7 @@ struct VolunteerAvailabilitySlider: View {
         }
         .frame(height: trackHeight)
         // 被挡住时轨道是一句要读清楚的话和一个入口，不是禁用态，不能压暗。
-        .opacity(acceptsGesture || status.blocksOpening ? 1 : 0.5)
+        .opacity(acceptsGesture || isBlocked ? 1 : 0.5)
         // 🔴 **辅助技术拿到的是普通控件。**
         //
         // VoiceOver / Switch Control / Voice Control 会彻底改变用户的物理交互方式，
@@ -142,7 +162,7 @@ struct VolunteerAvailabilitySlider: View {
         // ⚠️ 已开启时是「一枚按钮 + 一个自定义动作」，不是两枚按钮：两枚按钮会让读屏用户
         // 在底栏上划两次才走完，而其中一次念的是他八成不想要的那个（停止接单）。
         .accessibilityRepresentation {
-            if status.blocksOpening {
+            if isBlocked {
                 Button(VolunteerReadinessCopy.progressButtonTitle) { onShowProgress() }
                     .disabled(isUpdating)
                     .accessibilityHint(VolunteerReadinessCopy.progressButtonHint)
@@ -257,7 +277,7 @@ struct VolunteerAvailabilitySlider: View {
                 // 圆点、字、箭头整组居中（样例），字不撑满整条：撑满会把圆点和箭头推到两端。
                 trackLabel(title: pillTitle, detail: pillDetail, color: foreground, fillsWidth: false)
                     .layoutPriority(1)
-                if isAvailable, !status.blocksOpening {
+                if isAvailable, !isBlocked {
                     Image(systemName: "chevron.right")
                         .font(.footnote.weight(.bold))
                         .foregroundColor(foreground)
@@ -270,12 +290,26 @@ struct VolunteerAvailabilitySlider: View {
         // 被资质或培训挡住时点按去看进度；开着时点按进入接单页。
         .onTapGesture {
             guard !isUpdating else { return }
-            if status.blocksOpening {
+            if isBlocked {
                 onShowProgress()
             } else if isAvailable, isEnabled {
                 onEnterHub()
             }
         }
+        // 被挡住时按习惯去滑：警示震动 + 打开接单前进度，不能滑了没反应（见 `isBlockedOpenAttempt`）。
+        .simultaneousGesture(
+            DragGesture(minimumDistance: VolunteerAvailabilitySlide.blockedSwipeMinimum)
+                .onEnded { value in
+                    guard isBlocked, !isUpdating,
+                          VolunteerAvailabilitySlide.isBlockedOpenAttempt(
+                              dragX: value.translation.width,
+                              dragY: value.translation.height
+                          )
+                    else { return }
+                    HapticFeedback.play(.warning)
+                    onShowProgress()
+                }
+        )
     }
 
     private var pillTitle: String {
@@ -286,7 +320,7 @@ struct VolunteerAvailabilitySlider: View {
     /// 第二行。接单中不需要：「接单中 · 进入接单」已经说完了；锁屏收不到邀请那句在接单页的状态卡上。
     private var pillDetail: String? {
         guard let notice else { return nil }
-        guard isAvailable, !status.blocksOpening else { return notice.detail }
+        guard isAvailable, !isBlocked else { return notice.detail }
         // 开着却收不到单：原因 + 去处。
         return [notice.detail, VolunteerAvailabilityCopy.enterHubTitle].compactMap { $0 }.joined(separator: " · ")
     }
@@ -315,6 +349,15 @@ struct VolunteerAvailabilitySlider: View {
         status.isAccepting
             ? "\(VolunteerAvailabilityCopy.availableStatusTitle)，\(statusText)"
             : notice?.spoken ?? statusText
+    }
+
+    /// 显示「暂不能接单」胶囊而不是滑块。见 `VolunteerAvailabilitySlide.showsBlockedEntry`。
+    private var isBlocked: Bool {
+        VolunteerAvailabilitySlide.showsBlockedEntry(
+            isAvailable: isAvailable,
+            isEnabled: isEnabled,
+            blocksOpening: status.blocksOpening
+        )
     }
 
     /// 见 `VolunteerAvailabilitySlide.acceptsGesture` —— 停止接单那侧刻意不看 `isEnabled`。

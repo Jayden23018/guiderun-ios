@@ -114,6 +114,33 @@ final class VolunteerAvailabilityStatusTests: XCTestCase {
         XCTAssertEqual(notice?.detail, "还没上传身份材料，点这里看进度")
     }
 
+    /// 注册状态没同步完时滑块同样滑不开，必须说原因和去处。
+    /// 开着的人、或已有资质原因的人，不被这句盖掉。
+    func testUnfinishedRegistrationExplainsWhyTheSliderWillNotOpen() {
+        let notice = VolunteerAvailabilityStatus.canOpen.notice(
+            certificate: .approved, isAlternativeIdentityPath: false,
+            isAvailable: false, isRegistrationComplete: false
+        )
+        XCTAssertEqual(notice?.title, "暂不能接单")
+        XCTAssertEqual(notice?.detail, "陪跑员注册还没完成，点这里看进度")
+
+        XCTAssertNil(VolunteerAvailabilityStatus.canOpen.notice(
+            certificate: .approved, isAlternativeIdentityPath: false,
+            isAvailable: false, isRegistrationComplete: true
+        ))
+        XCTAssertEqual(
+            VolunteerAvailabilityStatus.blockedByTraining.notice(
+                certificate: .approved, isAlternativeIdentityPath: false,
+                isAvailable: false, isRegistrationComplete: false
+            )?.detail,
+            "还没完成必修培训，点这里看进度"
+        )
+        XCTAssertNil(VolunteerAvailabilityStatus.accepting.notice(
+            certificate: .approved, isAlternativeIdentityPath: false,
+            isAvailable: true, isRegistrationComplete: false
+        ))
+    }
+
     func testAcceptingAndCanOpenHaveNothingToExplain() {
         XCTAssertNil(VolunteerAvailabilityStatus.accepting.notice(certificate: .approved, isAlternativeIdentityPath: false))
         XCTAssertNil(VolunteerAvailabilityStatus.canOpen.notice(certificate: .approved, isAlternativeIdentityPath: false))

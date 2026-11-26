@@ -141,6 +141,23 @@ enum VolunteerAvailabilityStatus: Equatable {
         }
     }
 
+    /// 首页滑块位置上那句话。在 `notice(certificate:isAlternativeIdentityPath:)` 之外补一种：
+    /// 关着、三种资质原因都不成立、但注册状态还不是「已完成」—— 这时滑块同样滑不开，不能没有说明。
+    func notice(
+        certificate: VolunteerCertificateDisplayState,
+        isAlternativeIdentityPath: Bool,
+        isAvailable: Bool,
+        isRegistrationComplete: Bool
+    ) -> VolunteerAvailabilityNotice? {
+        if !isAvailable, !blocksOpening, !isRegistrationComplete {
+            return VolunteerAvailabilityNotice(
+                title: Self.blockedTitle,
+                detail: "陪跑员注册还没完成，\(VolunteerReadinessCopy.tapForProgress)"
+            )
+        }
+        return notice(certificate: certificate, isAlternativeIdentityPath: isAlternativeIdentityPath)
+    }
+
     private static let blockedTitle = "暂不能接单"
     private static let pausedTitle = "暂时收不到派单"
 }

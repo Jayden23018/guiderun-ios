@@ -22,6 +22,37 @@ extension AccessibilityAuditTests {
         )
     }
 
+    /// 被挡住时按习惯在胶囊上向右滑，也要打开接单前进度，不能滑了没反应。
+    ///
+    /// 走指针路径（真拖拽），不走读屏按钮：把胶囊上的拖拽手势删掉，这条会红。
+    @MainActor
+    func testSwipingTheBlockedPillOpensReadinessProgress() {
+        let app = launchVolunteerHome(
+            available: false,
+            extraEnvironment: ["AIDRUN_MOCK_VOLUNTEER_TRAINING_COMPLETED": "0"]
+        )
+        let pill = app.descendants(matching: .any)["volunteerAvailabilitySlider"].firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 25), "首页底部没有接单入口")
+        XCTAssertTrue(app.buttons["查看接单前进度"].firstMatch.exists, "关着且被培训挡住时应当显示暂不能接单胶囊")
+
+        let before = XCTAttachment(screenshot: app.screenshot())
+        before.name = "blocked-pill-before-swipe"
+        before.lifetime = .keepAlways
+        add(before)
+
+        let start = pill.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.5))
+        let end = pill.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let title = app.descendants(matching: .any)["volunteerReadinessTitle"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 15), "在暂不能接单胶囊上滑动后没有进入接单前进度页")
+
+        let after = XCTAttachment(screenshot: app.screenshot())
+        after.name = "blocked-pill-after-swipe"
+        after.lifetime = .keepAlways
+        add(after)
+    }
+
     /// 开着接单却被培训挡住时，停止接单要有一条**看得见**的路（#694 复核 A 级）。
     ///
     /// v3 去掉了向左滑停止，常规停止入口在接单页，而这一态进不了接单页（胶囊点进去是进度页）。
