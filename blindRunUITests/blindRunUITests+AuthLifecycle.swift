@@ -210,7 +210,8 @@ extension blindRunUITests {
 
         let initialAlert = app.alerts["确认删除账户"].firstMatch
         XCTAssertTrue(initialAlert.waitForExistence(timeout: 5))
-        XCTAssertTrue(initialAlert.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "仍需再次确认")).firstMatch.exists)
+        // 文案见 `AccountDeletionFlowModifier`：「删除前还会再确认一次。」（#745）
+        XCTAssertTrue(initialAlert.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "还会再确认一次")).firstMatch.exists)
         app.buttons["继续删除账户"].tap()
 
         let finalAlert = app.alerts["最终确认删除账户"].firstMatch

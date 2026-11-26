@@ -68,12 +68,9 @@ final class VolunteerRegistrationTests: XCTestCase, BlindRunTestSupport {
         // 这条用例走的是「首次提交资质证书」路径，所以先把状态压回后端枚举的 NONE，
         // 否则测到的根本不是首次上传。
         // APPROVED 重传被拒的另一面由 `testMockRejectsReuploadAfterApprovalLikeBackend` 钉死。
-        setenv("AIDRUN_MOCK_VOLUNTEER_VERIFICATION_STATUS", "NONE", 1)
-        defer { unsetenv("AIDRUN_MOCK_VOLUNTEER_VERIFICATION_STATUS") }
+        let verificationClient = makeMockClient(verificationStatus: "NONE")
 
-        let client = MockAPIClient()
-
-        let submittedVerification: VolunteerVerificationStatusResponse = try await client.upload(
+        let submittedVerification: VolunteerVerificationStatusResponse = try await verificationClient.upload(
             "/api/volunteer/verification",
             files: [MultipartFile(fieldName: "file", fileName: "cert.jpg", mimeType: "image/jpeg", data: Data([0xFF, 0xD8]))]
         )
@@ -82,6 +79,10 @@ final class VolunteerRegistrationTests: XCTestCase, BlindRunTestSupport {
             .pending,
             "NONE 状态下首次上传资质证书必须成功并置 PENDING"
         )
+
+        // 注册几步换一个新 Mock：带着上面的环境变量建出来的 Mock 停在 `STEP_4_TRAINING`
+        // （`applyUITestVerificationStatusOverride`），提交基本信息会被拒（#737）。
+        let client = MockAPIClient()
 
         do {
             let _: EmptyResponse = try await client.upload(
@@ -135,6 +136,13 @@ final class VolunteerRegistrationTests: XCTestCase, BlindRunTestSupport {
         } catch {
             // Expected: training remains an external deprecated contract, not an iOS Mock route.
         }
+    }
+
+    /// 带着 `AIDRUN_MOCK_VOLUNTEER_VERIFICATION_STATUS` 建一个 Mock：这个变量只在建的那一刻读（种子数据），建完就撤掉。
+    private func makeMockClient(verificationStatus: String) -> MockAPIClient {
+        setenv("AIDRUN_MOCK_VOLUNTEER_VERIFICATION_STATUS", verificationStatus, 1)
+        defer { unsetenv("AIDRUN_MOCK_VOLUNTEER_VERIFICATION_STATUS") }
+        return MockAPIClient()
     }
 
     func testVolunteerRegistrationBasicInfoRequestEncodesIdCardFields() throws {
