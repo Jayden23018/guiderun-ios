@@ -1299,6 +1299,10 @@ public struct Client: APIProtocol {
     /// 请求体复用 `ApnsTokenRequest`，`platform` 只用来决定 token 的格式校验（iOS 要 hex；Android 解绑也要带 `ANDROID`）。
     /// 本接口只解绑一台设备；账号注销才会清空该用户的全部设备。
     ///
+    /// **锁屏实时活动（#950）**：同时结束该用户名下全部进行中订单的锁屏卡（推 `end` 并立即移除），两端都清。
+    /// 卡片 token 记不到是哪台设备上报的，所以登出任何一台都会清掉全部卡片；另一台仍登录的设备
+    /// 下次起卡或拿到新 token 时重新上传即可。
+    ///
     /// - Remark: HTTP `DELETE /api/devices/apns`.
     /// - Remark: Generated from `#/paths//api/devices/apns/delete(unregisterApnsToken)`.
     public func unregisterApnsToken(_ input: Operations.unregisterApnsToken.Input) async throws -> Operations.unregisterApnsToken.Output {
@@ -1374,15 +1378,18 @@ public struct Client: APIProtocol {
     }
     /// 陪跑员上传锁屏实时活动的 push token
     ///
-    /// （2026-09-26 新增，陪跑员端订单页 v2）角色 `VOLUNTEER`，且必须是**这一单已接单的陪跑员**；只在
-    /// `DRIVER_EN_ROUTE` / `DRIVER_ARRIVED` 可传。App 按下「我出发了」后本地 `Activity.request(pushType: .token)`，
-    /// 拿到 `pushTokenUpdates` 的 token（十六进制）就调本接口；同一单再传一次覆盖。
+    /// （2026-09-26 新增，陪跑员端订单页 v2；2026-11-26 #950 放宽状态）角色 `VOLUNTEER`，且必须是**这一单眼前的陪跑员**：
+    /// `PENDING_INTRO_CALL` 时是本轮通话的候选人，其余状态是接单的人。可传的状态：
+    /// `PENDING_INTRO_CALL` / `SCHEDULED_CONFIRMED` / `PENDING_ACCEPT` / `DRIVER_EN_ROUTE` / `DRIVER_ARRIVED`。
+    /// App 起卡时 `Activity.request(pushType: .token)`（或开跑前 30 分钟后端远程起的卡），拿到 `pushTokenUpdates` 的 token
+    /// （十六进制）就调本接口；同一单再传一次覆盖。存下后立即按当前状态推一帧（已约好、开跑前 30 分钟以外的单直接 `end`）。
     ///
-    /// 之后后端经 APNs（`apns-push-type: liveactivity`）推：状态变化、ETA 分钟数变化、晚到变化、跑者到集合点、
-    /// 汇合档位变化时 `update`；离开两态（开跑、完成、取消、重派、结束等待）时 `end`，锁屏保留 5 分钟。
-    /// payload 形状与**日期编码**见 `docs/live-activity.md`（⚠️ `arriveAt` 是 Swift `Date` 默认编码，2001 纪元秒）。
+    /// 之后后端经 APNs（`apns-push-type: liveactivity`）推：交安排单、跑者确认 / 提异议、状态变化、ETA 分钟数变化、晚到变化、
+    /// 跑者到集合点、汇合档位变化时 `update`；约好（第一段收卡，锁屏留 15 分钟）、开跑、取消、换人时 `end`。
+    /// update / end 都不带 `alert`（提醒由普通通知负责）。payload 形状、`phase` 取值与**日期编码**见 `docs/live-activity.md`
+    /// （⚠️ 日期是 Swift `Date` 默认编码，2001 纪元秒）。
     ///
-    /// token 只存 Redis（6 小时），Redis 不可用时本次不存、锁屏不刷新，App 内不受影响。
+    /// token 只存 Redis（12 小时），Redis 不可用时本次不存、锁屏不刷新，App 内不受影响。
     ///
     /// - Remark: HTTP `POST /api/devices/live-activity-token`.
     /// - Remark: Generated from `#/paths//api/devices/live-activity-token/post(registerLiveActivityToken)`.
@@ -4979,7 +4986,7 @@ public struct Client: APIProtocol {
     /// - 403 `VOLUNTEER_NOT_AVAILABLE` — 志愿者关闭了接单开关（`wantsDispatch=false`）
     /// - 409 `ORDER_DISPATCH_MISMATCH` — 该订单当前未派送给你 / 邀请已失效。
     ///   也包括「要先通话、距开跑已不够聊一轮」（#970）：`ACCEPT` 和 `INTERESTED` 都回这个，
-    ///   message 是「距开跑已不够先通一次电话，这一单不能再接了」，熟人也一样。
+    ///   message 是「距开跑已不够先通一次电话，此订单不能再接了」，熟人也一样。
     ///   例外：开跑之后才重新匹配的单不先通话，替补直接 `ACCEPT`（`requiresIntroCall=false`）
     /// - 409 `ORDER_ALREADY_ACCEPTED` — 已被他人接单 / 状态不允许接单
     /// - 409 `ORDER_CONCURRENT_CONFLICT` — 乐观锁并发冲突，可稍后重试
@@ -9868,6 +9875,7 @@ public struct Client: APIProtocol {
     ///
     /// `NONE` 未提交 / `PENDING` 审核中（不要重复上传）/ `APPROVED` 已通过（可接单）/
     /// `REJECTED` 已驳回（可重新上传）。
+    /// `rejectionReason`（#906）只在 `REJECTED` 且审核人填了原因时有值，其余一律 `null`。
     /// 仅 `APPROVED` 对应 `verified=true`，其余三态都会被派单与接单拦截
     /// （首页 `GET /api/volunteer/dispatch-summary` 的 `notAvailableReasons` 含 `NOT_VERIFIED`）。
     ///

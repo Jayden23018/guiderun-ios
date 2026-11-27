@@ -4,6 +4,6 @@
 - [x] 1.3 单测 `NearbyVolunteersTests`
 
 ## 2. 验证（后端合入后）
-- [ ] 2.1 后端 #1079 合入后跑 `scripts/sync-api-client.sh`，提交生成代码
+- [x] 2.1 后端 #1079 合入后跑 `scripts/sync-api-client.sh`，提交生成代码
 - [ ] 2.2 真机跑 `NearbyVolunteersTests`
 - [ ] 2.3 真机 VoiceOver 听卡片焦点顺序与通告
