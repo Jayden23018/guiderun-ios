@@ -136,7 +136,7 @@ struct BookingNearbyVolunteersCard: View {
 
             if let onChangeStartPlace {
                 Button(NearbyVolunteersNotice.changeStartPlace, action: onChangeStartPlace)
-                    .buttonStyle(OutlineSecondaryButtonStyle(tint: AppColors.Flow.navy))
+                    .buttonStyle(OutlineSecondaryButtonStyle(tint: AppColors.textPrimary))
                     .accessibilityHint("搜索别的地点，从那里出发")
                     .accessibilityIdentifier("matchFirstNearbyVolunteersChangeStart")
             }

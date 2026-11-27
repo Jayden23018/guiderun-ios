@@ -30,6 +30,8 @@ final class FavoritePlaceStore: ObservableObject {
 
     @Published private(set) var places: [ResolvedPlace] = []
     @Published private(set) var defaultPlaceID: String?
+    /// `setDefaultPlace` 每成功一次加一。约跑页靠它知道「刚明确选了一次」：选的还是原来的默认时 id 不变（#1046）。
+    @Published private(set) var defaultPickCount = 0
 
     /// 默认出发地点。nil 表示用当前定位；收藏被删后也回到当前定位。
     var defaultPlace: ResolvedPlace? {
@@ -66,6 +68,7 @@ final class FavoritePlaceStore: ObservableObject {
             return false
         }
         defaultPlaceID = place?.id
+        defaultPickCount += 1
         return true
     }
 

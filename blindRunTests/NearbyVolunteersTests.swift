@@ -56,38 +56,58 @@ final class NearbyVolunteersTests: XCTestCase {
         XCTAssertNil(form.viewModel.errorMessage, "只是提示：查不到不许冒出报错")
     }
 
-    /// 当前定位抖动几十米不重查；挪出 1 公里或换了地点才查。
+    /// 当前定位漂移不重查；离**上次查询点**满 1 公里或换了地点才查。纬度差 0.0081 ≈ 900 米，0.0099 ≈ 1100 米。
     func testQueriesAgainOnlyWhenTheStartPointChanges() async {
         let form = makeForm()
         form.viewModel.selectedStartPlace = nil
-        form.viewModel.currentResolvedPlace = place(id: "device-current", latitude: 31.2304, source: .deviceLocation)
         form.orders.nearby.result = .success(response(has: false, hint: hint))
 
-        await form.viewModel.refreshNearbyVolunteers()
-        form.viewModel.currentResolvedPlace = place(id: "amap-regeo", latitude: 31.2309, source: .deviceLocation)
-        await form.viewModel.refreshNearbyVolunteers()
-        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 1, "约 55 米，算同一个出发点")
+        for latitude in [31.2304, 31.2358, 31.2385] {
+            form.viewModel.currentResolvedPlace = place(id: "amap-\(latitude)", latitude: latitude, source: .deviceLocation)
+            await form.viewModel.refreshNearbyVolunteers()
+        }
+        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 1, "900 米以内算同一个出发点")
 
-        form.viewModel.currentResolvedPlace = place(id: "device-current", latitude: 31.2504, source: .deviceLocation)
+        form.viewModel.currentResolvedPlace = place(id: "device-current", latitude: 31.2403, source: .deviceLocation)
         await form.viewModel.refreshNearbyVolunteers()
-        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 2, "约 2.2 公里")
+        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 2, "离上次查询点约 1100 米")
 
-        form.viewModel.selectedStartPlace = place(id: "poi-2", latitude: 31.2504, source: .manual)
+        form.viewModel.selectedStartPlace = place(id: "poi-2", latitude: 31.2403, source: .manual)
         await form.viewModel.refreshNearbyVolunteers()
         XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 3, "换成了选定的地点")
     }
 
-    func testChangingTheStartPlaceDropsTheOldCard() async {
+    /// 换地点：新结果还没回来时旧卡就得撤掉。
+    func testChangingTheStartPlaceDropsTheOldCardBeforeTheNewAnswerArrives() async {
         let form = makeForm()
+        let viewModel = form.viewModel
+        form.orders.nearby.result = .success(response(has: false, hint: hint))
+        await viewModel.refreshNearbyVolunteers()
+        XCTAssertNotNil(viewModel.nearbyVolunteersNotice)
+
+        form.orders.nearby.gate = { XCTAssertNil(viewModel.nearbyVolunteersNotice, "旧出发点的卡还挂着") }
+        viewModel.selectedStartPlace = place(id: "poi-2", latitude: 22.5, source: .manual)
+        await viewModel.refreshNearbyVolunteers()
+
+        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 2)
+    }
+
+    /// 当前定位只是挪远了：等结果回来再换卡；查失败就撤掉。
+    func testMovingFarKeepsTheCardUntilTheNewAnswerArrives() async {
+        let form = makeForm()
+        let viewModel = form.viewModel
+        viewModel.selectedStartPlace = nil
+        viewModel.currentResolvedPlace = place(id: "device-current", latitude: 31.2304, source: .deviceLocation)
         form.orders.nearby.results = [.success(response(has: false, hint: hint))]
         form.orders.nearby.result = .failure(APIError.networkError(URLError(.notConnectedToInternet)))
-        await form.viewModel.refreshNearbyVolunteers()
-        XCTAssertNotNil(form.viewModel.nearbyVolunteersNotice)
+        await viewModel.refreshNearbyVolunteers()
 
-        form.viewModel.selectedStartPlace = place(id: "poi-2", latitude: 22.5, source: .manual)
-        await form.viewModel.refreshNearbyVolunteers()
+        form.orders.nearby.gate = { XCTAssertNotNil(viewModel.nearbyVolunteersNotice, "同一出发点重查时卡不该闪掉") }
+        viewModel.currentResolvedPlace = place(id: "device-current", latitude: 31.2504, source: .deviceLocation)
+        await viewModel.refreshNearbyVolunteers()
 
-        XCTAssertNil(form.viewModel.nearbyVolunteersNotice)
+        XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 2)
+        XCTAssertNil(viewModel.nearbyVolunteersNotice)
     }
 
     /// 旧出发点的结果晚到，不许盖掉新出发点的结论。
@@ -119,10 +139,25 @@ final class NearbyVolunteersTests: XCTestCase {
         form.viewModel.selectedStartPlace = nil
         form.viewModel.currentResolvedPlace = place(id: "demo-current", latitude: 39.9, source: .demoDefault)
 
+        XCTAssertFalse(form.appState.currentEnvironment.isMock, "前提：不是 Mock 环境")
         await form.viewModel.refreshNearbyVolunteers()
 
         XCTAssertEqual(form.orders.callCount("nearbyVolunteers(latitude:longitude:)"), 0)
         XCTAssertNil(form.viewModel.nearbyVolunteersNotice)
+    }
+
+    /// 添加页选回原来的默认（含「使用当前定位」）时默认 id 不变，约跑页靠选择次数跟上。
+    func testPickingTheSameDefaultStartPlaceAgainStillCounts() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = FavoritePlaceStore(directory: directory)
+
+        XCTAssertTrue(store.setDefaultPlace(nil))
+        XCTAssertTrue(store.setDefaultPlace(nil))
+
+        XCTAssertNil(store.defaultPlaceID)
+        XCTAssertEqual(store.defaultPickCount, 2)
     }
 
     func testMockSwitchesBetweenSomeoneAndNoOne() {
@@ -152,9 +187,13 @@ final class NearbyVolunteersTests: XCTestCase {
         let orders = FakeOrderService()
         let persistence = AppStatePersistenceFactory.makeIsolatedTest()
         addTeardownBlock { persistence.reset() }
+        // 环境写进持久化、不给 `currentEnvironment` 赋值：赋值会跑会话清理，清掉测试机上真实的常用地点。
+        if let environment {
+            persistence.set(environment.rawValue, forKey: AppConstants.UserDefaultsKeys.apiEnvironment)
+        }
         let appState = AppState(orders: orders, persistence: persistence, tokenStore: InMemoryTokenStore())
-        if let environment { appState.currentEnvironment = environment }
         let location = LocationService()
+        location.simulatePreciseLocationOffForTesting(false)
         let viewModel = BlindBookingViewModel()
         viewModel.configureForTesting(speechService: SpeechService(), locationService: location, appState: appState)
         viewModel.selectedStartPlace = place(id: "poi-1", latitude: 31.2304, source: .manual)

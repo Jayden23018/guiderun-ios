@@ -13,6 +13,10 @@ The client SHALL call `GET /api/orders/nearby-volunteers` with the current GCJ-0
 - **WHEN** there is no trusted coordinate, the request fails (including 404 and 429), or `hint` is null
 - **THEN** no card SHALL be shown and no error SHALL be shown
 
+#### Scenario: Picking the current default again on the add page
+- **WHEN** this order uses a non-default place and the runner picks the existing default (or the current location) on the add page
+- **THEN** the booking page SHALL use that pick
+
 #### Scenario: Start point changes while a request is in flight
 - **WHEN** the response belongs to a previous start point
 - **THEN** the client SHALL ignore it
