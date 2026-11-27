@@ -21,6 +21,9 @@ struct NearbyVolunteersNotice: Equatable {
 
     var spokenLabel: String { "提示，\(Self.title)。\(hint)" }
 
+    /// 结果回来时主动念的话。结论放最前面：看不见屏幕的人第一句就听到附近没人。
+    var speech: String { "\(Self.title)。\(hint)" }
+
     /// `nil` = 不显示：附近有人（标题是事实断言，有人时绝不说没人），或后端没给那句话。
     init?(_ response: NearbyVolunteersResponse) {
         guard !response.hasNearbyVolunteers, let hint = response.hint?.nilIfBlank else { return nil }

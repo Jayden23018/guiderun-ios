@@ -31,4 +31,18 @@ extension BlindBookingViewModel {
         guard queriedNearbyStartPoint == point else { return }
         nearbyVolunteersNotice = response.flatMap { NearbyVolunteersNotice($0) }
     }
+
+    /// 附近没人时马上念出来（负责人 2026-11-27）。走 `speak` 不走只发给读屏的通告：只听 App 语音的人也要听到。
+    /// 它会打断正在念的那句，所以那句接在后面重念：开场白按此刻的选择重拼（`currentEntry`），
+    /// 别的话原样接上；上一个出发点的「没人」已经过时，不接。
+    func speakNearbyVolunteersNotice(_ notice: NearbyVolunteersNotice, spokenEntry: String?, currentEntry: String) {
+        guard let speechService else { return }
+        var followUp = speechService.isSpeaking ? speechService.lastSpokenText : nil
+        if followUp == spokenEntry, followUp != nil {
+            followUp = currentEntry
+        } else if followUp?.hasPrefix(NearbyVolunteersNotice.title) == true {
+            followUp = nil
+        }
+        speechService.speak(notice.speech + (followUp ?? ""))
+    }
 }

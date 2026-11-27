@@ -204,12 +204,12 @@ final class VoiceService: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     ///
     /// 开跑倒计时那三拍走的就是这条路 —— `状态清单.md` §2 逐字要求数字走 announcement 通道
     /// 「不插入遍历顺序、不移动焦点」，所以它不能改走合成器；这一道闸是它认优先级的唯一方式。
-    func announce(_ text: String, priority: AnnouncementPriority = .counterpartAction, queued: Bool = false) {
+    func announce(_ text: String, priority: AnnouncementPriority = .counterpartAction) {
         clearStaleUtteranceIfNeeded()
         guard AnnouncementQueue.allowsAnnouncement(
             priority, speaking: currentPriority, isCallActive: isCallActive()
         ) else { return }
-        postVoiceOverAnnouncement(text, queued: queued)
+        postVoiceOverAnnouncement(text)
     }
 
     /// 重复播报当前状态（"重复当前状态"按钮调用）

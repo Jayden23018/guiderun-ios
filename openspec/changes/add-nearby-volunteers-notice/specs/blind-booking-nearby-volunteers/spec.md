@@ -7,7 +7,12 @@ The client SHALL call `GET /api/orders/nearby-volunteers` with the current GCJ-0
 - **WHEN** the response is `hasNearbyVolunteers: false` with a `hint`
 - **THEN** the card SHALL be the first element after the start-point heading
 - **AND** VoiceOver SHALL read it as one element: 「提示，目前附近无志愿者。<hint>」
-- **AND** the client SHALL post a queued announcement with the title
+- **AND** the client SHALL speak 「目前附近无志愿者。<hint>」 as soon as the result arrives, through both the App voice and VoiceOver
+
+#### Scenario: The notice interrupts another sentence
+- **WHEN** the result arrives while the entry announcement is still being spoken
+- **THEN** the client SHALL speak the notice first, followed by an entry announcement built from the current selection
+- **AND** any other interrupted sentence SHALL be repeated after the notice, except the notice of a previous start point
 
 #### Scenario: Result is unknown
 - **WHEN** there is no trusted coordinate, the request fails (including 404 and 429), or `hint` is null

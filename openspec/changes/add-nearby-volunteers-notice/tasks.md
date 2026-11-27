@@ -2,6 +2,7 @@
 - [x] 1.1 模型、端点、service、Mock（`AIDRUN_MOCK_NEARBY_VOLUNTEERS=none`）
 - [x] 1.2 约跑页提示卡、换出发点按钮、排队通告
 - [x] 1.3 单测 `NearbyVolunteersTests`
+- [x] 1.4 附近没人时用 `speak` 念结论和后端那句话（负责人 2026-11-27），替换只发读屏通告标题
 
 ## 2. 验证（后端合入后）
 - [x] 2.1 后端 #1079 合入后跑 `scripts/sync-api-client.sh`，提交生成代码

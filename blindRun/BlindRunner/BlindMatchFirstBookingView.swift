@@ -29,6 +29,8 @@ struct BlindMatchFirstBookingView: View {
     /// 这一单从哪个常用地点出发。`nil` = 当前定位。只管这一单，不改默认出发地点。
     @State private var selectedFavoriteID: String?
     @State private var hasAppeared = false
+    /// 进页念出去的那份开场白，用来认出「附近没人」打断的是不是它。
+    @State private var spokenEntry: String?
     /// 被拒后的短提示（#813）。`nil` = 不显示。
     @State private var gateAlert: BookingStartGateAlert?
     /// 点提交后等系统框回答的这段时间，按钮不可重复点。
@@ -101,10 +103,10 @@ struct BlindMatchFirstBookingView: View {
         .onChange(of: viewModel.nearbyVolunteersStartPoint) { _ in
             Task { await viewModel.refreshNearbyVolunteers() }
         }
-        // 结果总是在页面出现之后才回来：补一条排队的通告，不打断正在念的进页播报。
+        // 结果总是在页面出现之后才回来：附近没人就立刻念，进页播报被打断的话接在后面。
         .onChange(of: viewModel.nearbyVolunteersNotice) { notice in
-            guard notice != nil else { return }
-            speechService.announce(NearbyVolunteersNotice.title, queued: true)
+            guard let notice else { return }
+            viewModel.speakNearbyVolunteersNotice(notice, spokenEntry: spokenEntry, currentEntry: entryAnnouncement)
         }
         // 规则晚到（或值守时段变了）时，已选的日子 / 时段可能不再合法：换到最近能约的。
         .onChange(of: rules) { _ in revalidateSelection() }
@@ -267,7 +269,9 @@ struct BlindMatchFirstBookingView: View {
             selectedDay = initial.day
             selectedSlot = initial.slot
         }
-        speechService.speak(entryAnnouncement)
+        let entry = entryAnnouncement
+        spokenEntry = entry
+        speechService.speak(entry)
     }
 
     /// 开场只念一次（后到的 `speak` 会切断先到的）：定位用不了时换掉「从当前位置出发」，有开放范围就附一句。
