@@ -39,7 +39,7 @@ extension MockAPIClient {
             return try handleDeleteAccount()
         }
         // 拉黑的 DELETE 也挂在 /api/users/ 下，同样要放在下面的兜底拒绝之前。
-        if let result = routeUserBlock(method: method, path: path) {
+        if let result = try routeUserBlock(method: method, path: path) ?? routeNearbyVolunteers(method: method, path: path) {
             return result
         }
         // 注意：紧急联系人的 DELETE 也挂在 /api/users/ 下，必须先放行再兜底拒绝。

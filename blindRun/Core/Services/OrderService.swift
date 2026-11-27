@@ -31,6 +31,8 @@ protocol OrderServing: Sendable {
     /// 没有时 `data` 为 `null`（不是 404、不是空对象），所以返回信封而不是订单本体。
     func activeOrder() async throws -> ActiveOrderEnvelope
     func orderDetail(orderId: Int64) async throws -> OrderDetailResponse
+    /// 出发点（GCJ-02）附近有没有可接单的陪跑员。只用来提示，下单不看它。
+    func nearbyVolunteers(latitude: Double, longitude: Double) async throws -> NearbyVolunteersResponse
 
     /// 附近可接订单摘要（裸数组）。**调用方只有邀请卡的补数逻辑**，
     /// 用途与「为什么正在等我回复的那一单也在里面」见 `AvailableOrderResponse`。
@@ -163,6 +165,13 @@ struct OrderService: OrderServing {
 
     func orderDetail(orderId: Int64) async throws -> OrderDetailResponse {
         try await transport.send(OrderEndpoint.detail(orderId: orderId).request)
+    }
+
+    func nearbyVolunteers(latitude: Double, longitude: Double) async throws -> NearbyVolunteersResponse {
+        try await transport.send(
+            OrderEndpoint.nearbyVolunteers.request,
+            query: ["latitude": String(latitude), "longitude": String(longitude)]
+        )
     }
 
     func availableOrders() async throws -> [AvailableOrderResponse] {

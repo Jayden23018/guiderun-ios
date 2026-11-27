@@ -42,6 +42,13 @@ struct BlindMatchFirstBookingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 sectionTitle("从哪出发？")
+                // 标题后的第一个读屏焦点（#1046）。
+                if let notice = viewModel.nearbyVolunteersNotice {
+                    BookingNearbyVolunteersCard(
+                        notice: notice,
+                        onChangeStartPlace: favoritePlaces.places.count < FavoritePlaceStore.capacity ? onAddFavorite : nil
+                    )
+                }
                 if let notice = launchAreaNotice { BookingLaunchAreaNoticeRow(text: notice) }
                 BookingStartPlacePicker(
                     places: favoritePlaces.places,
@@ -90,11 +97,20 @@ struct BlindMatchFirstBookingView: View {
         .onChange(of: locationService.accuracyAuthorization) { _ in
             Task { await viewModel.refreshCurrentLocationIfNeeded() }
         }
+        // 进页后第一次拿到坐标、以及换了出发点时查附近有没有陪跑员；同一个出发点只查一次。
+        .onChange(of: viewModel.nearbyVolunteersStartPoint) { _ in
+            Task { await viewModel.refreshNearbyVolunteers() }
+        }
+        // 结果总是在页面出现之后才回来：补一条排队的通告，不打断正在念的进页播报。
+        .onChange(of: viewModel.nearbyVolunteersNotice) { notice in
+            guard notice != nil else { return }
+            speechService.announce(NearbyVolunteersNotice.title, queued: true)
+        }
         // 规则晚到（或值守时段变了）时，已选的日子 / 时段可能不再合法：换到最近能约的。
         .onChange(of: rules) { _ in revalidateSelection() }
         // 从添加页回来：添加页会把选中的地点（新收藏、已收藏过的、或「使用当前定位」）设成默认出发地点并朗读，
-        // 这一单就跟着从那里出发。看默认 id 不看收藏条数：选已收藏过的地点时条数不变。
-        .onChange(of: favoritePlaces.defaultPlaceID) { _ in
+        // 这一单就跟着从那里出发。看「选了几次」不看默认 id：这一单选着别的收藏、又选回原默认时 id 不变。
+        .onChange(of: favoritePlaces.defaultPickCount) { _ in
             if let place = favoritePlaces.defaultPlace {
                 useFavorite(place)
             } else {

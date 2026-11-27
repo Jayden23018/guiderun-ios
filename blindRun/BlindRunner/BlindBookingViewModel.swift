@@ -66,6 +66,9 @@ final class BlindBookingViewModel: ObservableObject {
     /// 约跑「先匹配后商量」（#806）选中的时段。非 `nil` 时下单发时段单：时间取这一段、`timeFlexible = true`，
     /// 跑步需求一律不发（后端按跑者资料，陪跑员通话后在安排单里改）。
     @Published var flexibleSlot: BookingFlexibleSlot?
+    /// 出发点附近没有陪跑员时的提示卡（#1046）。见 `BlindBookingViewModel+NearbyVolunteers.swift`。
+    @Published var nearbyVolunteersNotice: NearbyVolunteersNotice?
+    var queriedNearbyStartPoint: NearbyVolunteersStartPoint?
 
     private(set) weak var appState: AppState?
     private(set) weak var locationService: LocationService?

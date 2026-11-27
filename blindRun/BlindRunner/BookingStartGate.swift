@@ -108,6 +108,44 @@ struct BookingLaunchAreaNoticeRow: View {
     }
 }
 
+/// 出发点附近没有陪跑员时的常驻提示卡（#1046）。样式同上面那行开放范围提示；只提示，不拦下单。
+struct BookingNearbyVolunteersCard: View {
+    let notice: NearbyVolunteersNotice
+    /// `nil` = 不给按钮（常用地点收藏满了，进添加页会挤掉最旧的一条；圆排里照样能换）。
+    let onChangeStartPlace: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "person.2.slash")
+                    .foregroundColor(AppColors.Flow.secondaryText)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(NearbyVolunteersNotice.title)
+                        .font(AppFonts.body().weight(.bold))
+                    Text(notice.hint)
+                        .font(AppFonts.body())
+                }
+                .foregroundColor(AppColors.Flow.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(notice.spokenLabel)
+            .accessibilityIdentifier("matchFirstNearbyVolunteersNotice")
+
+            if let onChangeStartPlace {
+                Button(NearbyVolunteersNotice.changeStartPlace, action: onChangeStartPlace)
+                    .buttonStyle(OutlineSecondaryButtonStyle(tint: AppColors.textPrimary))
+                    .accessibilityHint("搜索别的地点，从那里出发")
+                    .accessibilityIdentifier("matchFirstNearbyVolunteersChangeStart")
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.bottom, 10)
+    }
+}
+
 extension View {
     /// 被拒后的短提示：两个出路，「选常用地点」只是关掉提示，「去设置」打开本 App 的系统设置页。
     func bookingStartGateAlert(_ alert: Binding<BookingStartGateAlert?>) -> some View {
