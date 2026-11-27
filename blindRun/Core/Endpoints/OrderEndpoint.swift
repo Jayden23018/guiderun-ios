@@ -26,6 +26,8 @@ enum OrderEndpoint {
     /// 那条是分页历史列表，靠客户端 filter + sort 猜哪条还活着；这条由服务端判。
     case active
     case detail(orderId: Int64)
+    /// 出发点附近有没有可接单的陪跑员（BLIND，后端 #1079）。坐标走 query。
+    case nearbyVolunteers
 
     /// 附近可接订单摘要。**本 App 只用它给邀请卡补三项**（视力 / 引导方式 / 跑多久），
     /// 不做「附近还没人接的」列表 —— 见 `AvailableOrderResponse` 的说明。
@@ -97,6 +99,8 @@ enum OrderEndpoint {
             return EndpointRequest(.get, "/api/orders/active")
         case .detail(let orderId):
             return EndpointRequest(.get, "/api/orders/\(orderId)")
+        case .nearbyVolunteers:
+            return EndpointRequest(.get, "/api/orders/nearby-volunteers")
         case .available:
             return EndpointRequest(.get, "/api/orders/available")
         case .pendingInvites:

@@ -93,6 +93,8 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
     var dispatchSummaryResult: Result<VolunteerDispatchSummaryResponse, Error> = .failure(NotStubbed(method: "dispatchSummary"))
     var setDispatchStatusResult: Result<Void, Error> = .failure(NotStubbed(method: "setDispatchStatus"))
 
+    var nearby = NearbyStub()
+
     // MARK: 按顺序弹出的罐装值（空了退回上面的单值）
 
     var orderDetailResults: [Result<OrderDetailResponse, Error>] = []
@@ -114,10 +116,6 @@ final class FakeOrderService: OrderServing, @unchecked Sendable {
     private func record(_ method: String = #function) {
         calls.append(method)
         callCounts[method, default: 0] += 1
-    }
-
-    private func next<T>(_ queue: inout [Result<T, Error>], fallback: Result<T, Error>) -> Result<T, Error> {
-        queue.isEmpty ? fallback : queue.removeFirst()
     }
 
     // MARK: - OrderServing
@@ -357,5 +355,27 @@ extension FakeOrderService {
     func ringVolunteer(orderId: Int64) async throws -> OrderNudgeResponse {
         record()
         throw NotStubbed(method: "ringVolunteer")
+    }
+}
+
+// 放在类体外：类体已到 SwiftLint 的 250 行上限。
+extension FakeOrderService {
+    struct NearbyStub {
+        var result: Result<NearbyVolunteersResponse, Error> = .failure(NotStubbed(method: "nearbyVolunteers"))
+        var results: [Result<NearbyVolunteersResponse, Error>] = []
+        /// 挂住 `nearbyVolunteers` 的钩子（同 `orderDetailGate`）。
+        var gate: (@MainActor @Sendable () async -> Void)?
+        var lastCoordinate: [Double]?
+    }
+
+    func nearbyVolunteers(latitude: Double, longitude: Double) async throws -> NearbyVolunteersResponse {
+        record()
+        nearby.lastCoordinate = [latitude, longitude]
+        if let gate = nearby.gate { await gate() }
+        return try next(&nearby.results, fallback: nearby.result).get()
+    }
+
+    private func next<T>(_ queue: inout [Result<T, Error>], fallback: Result<T, Error>) -> Result<T, Error> {
+        queue.isEmpty ? fallback : queue.removeFirst()
     }
 }
