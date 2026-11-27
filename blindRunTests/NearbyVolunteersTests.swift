@@ -33,6 +33,47 @@ final class NearbyVolunteersTests: XCTestCase {
         XCTAssertEqual(notice.spokenLabel, "提示，目前附近无志愿者。\(hint)")
     }
 
+    // MARK: - 主动播报
+
+    /// 开场白还没念完：先说没人，再接按此刻选择重拼的开场白。
+    func testSpeaksTheNoticeFirstAndRepeatsTheInterruptedEntry() throws {
+        let (form, speech, notice) = try makeSpeechForm()
+        speech.speak("进页开场白")
+
+        form.viewModel.speakNearbyVolunteersNotice(notice, spokenEntry: "进页开场白", currentEntry: "新开场白")
+
+        XCTAssertEqual(speech.lastSpokenText, "目前附近无志愿者。\(hint)新开场白")
+    }
+
+    /// 没有正在念的话（定位回来得晚）：只说没人，不重念开场白。
+    func testSpeaksOnlyTheNoticeWhenNothingIsPlaying() throws {
+        let (form, speech, notice) = try makeSpeechForm()
+
+        form.viewModel.speakNearbyVolunteersNotice(notice, spokenEntry: "进页开场白", currentEntry: "新开场白")
+
+        XCTAssertEqual(speech.lastSpokenText, "目前附近无志愿者。\(hint)")
+    }
+
+    /// 正在念别的话（例如添加页的「已收藏」确认）：原样接在后面，不能吞掉。
+    func testKeepsAnotherInterruptedSentenceAfterTheNotice() throws {
+        let (form, speech, notice) = try makeSpeechForm()
+        speech.speak("已收藏操场，之后默认从这里出发。")
+
+        form.viewModel.speakNearbyVolunteersNotice(notice, spokenEntry: "进页开场白", currentEntry: "新开场白")
+
+        XCTAssertEqual(speech.lastSpokenText, "目前附近无志愿者。\(hint)已收藏操场，之后默认从这里出发。")
+    }
+
+    /// 连着换出发点：上一个出发点的「没人」不许叠着重念。
+    func testDoesNotRepeatTheNoticeOfThePreviousStartPlace() throws {
+        let (form, speech, notice) = try makeSpeechForm()
+        speech.speak("目前附近无志愿者。上一个出发点的话。")
+
+        form.viewModel.speakNearbyVolunteersNotice(notice, spokenEntry: "进页开场白", currentEntry: "新开场白")
+
+        XCTAssertEqual(speech.lastSpokenText, "目前附近无志愿者。\(hint)")
+    }
+
     // MARK: - 查询时机
 
     func testShowsTheCardForTheSelectedStartPlace() async {
@@ -169,6 +210,15 @@ final class NearbyVolunteersTests: XCTestCase {
 
     private func response(has: Bool, hint: String?) -> NearbyVolunteersResponse {
         NearbyVolunteersResponse(hasNearbyVolunteers: has, radiusKm: 20, hint: hint)
+    }
+
+    private func makeSpeechForm() throws -> (Form, SpeechService, NearbyVolunteersNotice) {
+        let form = makeForm()
+        let speech = SpeechService()
+        speech.isCallActive = { false }
+        form.viewModel.configureForTesting(speechService: speech, locationService: form.location, appState: form.appState)
+        let notice = try XCTUnwrap(NearbyVolunteersNotice(response(has: false, hint: hint)))
+        return (form, speech, notice)
     }
 
     private func place(id: String, latitude: Double, source: LocationSource) -> ResolvedPlace {
