@@ -99,6 +99,48 @@ final class BlindBookingGateTests: XCTestCase {
         XCTAssertNil(viewModel.makeCreateOrderRequest(), "演示坐标不得进入下单请求体")
     }
 
+    /// 约跑页 `onAppear` 就刷新当前位置，那一刻定位常常还没回来。演示坐标不许经
+    /// `currentResolvedPlace` 这份缓存进下单请求 —— 上一条没调刷新，缓存那条路它测不到。
+    @MainActor
+    func testRefreshWithoutAFixDoesNotCacheTheDemoCoordinate() async {
+        let location = LocationService()
+        location.simulateMissingDeviceLocationForTesting()
+        let viewModel = makeBookingViewModel(locationService: location)
+
+        await viewModel.refreshCurrentLocation()
+
+        XCTAssertNil(viewModel.resolvedStartPlace, "演示坐标不是出发地点")
+        XCTAssertEqual(viewModel.firstMissingGate, .startPoint)
+        XCTAssertNil(viewModel.makeCreateOrderRequest(), "演示坐标不得进入下单请求体")
+
+        // 定位回来之后照常用设备位置。
+        location.simulateDeviceLocationForTesting(
+            CLLocationCoordinate2D(latitude: 31.2304, longitude: 121.4737), capturedAt: Date()
+        )
+        location.simulatePreciseLocationOffForTesting(false)
+        await viewModel.refreshCurrentLocationIfNeeded()
+
+        XCTAssertEqual(viewModel.resolvedStartPlace?.source, .deviceLocation)
+    }
+
+    /// 对照：不发网络请求的 Mock 通道仍然用演示坐标当起点。
+    @MainActor
+    func testRefreshWithoutAFixKeepsTheDemoStartPointInMock() async {
+        let persistence = AppStatePersistenceFactory.makeIsolatedTest()
+        addTeardownBlock { persistence.reset() }
+        // 环境写进持久化、不给 `currentEnvironment` 赋值：赋值会跑会话清理，清掉测试机上真实的常用地点。
+        persistence.set(APIEnvironment.mock.rawValue, forKey: AppConstants.UserDefaultsKeys.apiEnvironment)
+        let appState = AppState(persistence: persistence, tokenStore: InMemoryTokenStore())
+        XCTAssertTrue(appState.currentEnvironment.isMock, "前提：Mock 环境")
+        let location = LocationService()
+        location.simulateMissingDeviceLocationForTesting()
+        let viewModel = makeBookingViewModel(locationService: location, appState: appState)
+
+        await viewModel.refreshCurrentLocation()
+
+        XCTAssertEqual(viewModel.resolvedStartPlace?.source, .demoDefault)
+    }
+
     /// 关掉定位权限之后，手动搜到的出发地点必须仍然能下单（Apple 5.1.1(iv)）。
     ///
     /// 2026-08-18 之前 `isLocationDenied` 是第四道硬门槛：关掉定位 ⇒ `canSubmit` 恒 false，

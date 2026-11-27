@@ -22,6 +22,13 @@ extension BlindBookingViewModel {
             currentLocationAccuracyMeters = nil
             return
         }
+        // 真实定位还没回来时不缓存演示坐标：`resolvedStartPlace` 认这份缓存，存进去北京那个固定点就能下单。
+        // 定位回来后约跑页监听 `currentLocation` 会再刷一次。只有 Mock 与 UI 测试放行。
+        guard !locationService.isUsingDemoFallback || allowsDemoFallbackAsStartPoint else {
+            currentResolvedPlace = nil
+            currentLocationAccuracyMeters = nil
+            return
+        }
 
         let coordinate = bookingCoordinate(from: locationService)
         // 记下这次解析用的那个样本的精度，而不是渲染时再去读 —— 卡片上的提示说的是「这个地址」的误差。

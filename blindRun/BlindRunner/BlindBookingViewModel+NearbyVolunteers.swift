@@ -6,7 +6,7 @@ extension BlindBookingViewModel {
     /// 拿去查的出发点。`nil` = 没有可信坐标，不查。
     var nearbyVolunteersStartPoint: NearbyVolunteersStartPoint? {
         guard let place = resolvedStartPlace else { return nil }
-        // 定位还没回来时 `currentResolvedPlace` 可能是演示坐标：拿它查，说的是别人那个城市有没有人。
+        // 演示坐标拿去查，说的是别人那个城市有没有人。`refreshCurrentLocation` 已经不缓存它，这里再挡一道。
         guard place.source != .demoDefault || allowsDemoFallbackAsStartPoint else { return nil }
         return NearbyVolunteersStartPoint(
             selectedPlaceID: selectedStartPlace?.id, latitude: place.latitude, longitude: place.longitude
