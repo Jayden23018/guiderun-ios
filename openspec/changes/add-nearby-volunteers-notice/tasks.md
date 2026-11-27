@@ -5,5 +5,5 @@
 
 ## 2. 验证（后端合入后）
 - [x] 2.1 后端 #1079 合入后跑 `scripts/sync-api-client.sh`，提交生成代码
-- [ ] 2.2 真机跑 `NearbyVolunteersTests`
+- [x] 2.2 真机跑 `NearbyVolunteersTests`（2026-11-27，iPhone 16 Pro，13 条通过）
 - [ ] 2.3 真机 VoiceOver 听卡片焦点顺序与通告
