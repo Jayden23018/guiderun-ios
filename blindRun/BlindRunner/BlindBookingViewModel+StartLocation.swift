@@ -2,6 +2,30 @@ import CoreLocation
 import Foundation
 
 extension BlindBookingViewModel {
+    /// 点提交时定位还没回来，最多等这么久。与求助等定位取同一个数（`EmergencyCoordinator.locationWaitTimeout`）。
+    static let startPointFixWaitTimeout: TimeInterval = 5
+    static let waitingForFixMessage = "还没拿到当前位置，请稍等再点，或选常用地点。"
+
+    /// 出发点只能靠当前位置、而定位样本还没到。权限被拒与精确位置关闭归 `BookingStartGate` 管，这里不算。
+    var isAwaitingDeviceLocation: Bool {
+        guard let locationService, selectedStartPlace == nil, resolvedStartPlace == nil else { return false }
+        return !locationService.isDenied && !locationService.isPreciseLocationOff
+    }
+
+    /// 提交前等第一个定位样本。刚允许临时精确位置时旧样本已被清掉（`applyAccuracyAuthorization`），
+    /// 新样本稍后才到，不等就会让「允许后继续提交」落空。
+    func waitForDeviceStartPointIfNeeded() async {
+        guard isAwaitingDeviceLocation, let locationService else { return }
+        locationService.requestOneTimeLocation()
+        let deadline = Date().addingTimeInterval(Self.startPointFixWaitTimeout)
+        while isAwaitingDeviceLocation, Date() < deadline {
+            guard !Task.isCancelled else { return }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        // 等到了就先逆地理出地址，免得订单上的出发地址只有「当前位置」四个字。
+        if selectedStartPlace == nil, locationService.currentLocation != nil { await refreshCurrentLocation() }
+    }
+
     func refreshCurrentLocation() async {
         guard let locationService else { return }
         guard !locationService.isDenied else {
@@ -29,6 +53,8 @@ extension BlindBookingViewModel {
             currentLocationAccuracyMeters = nil
             return
         }
+        // 位置到了，撤掉「还没拿到当前位置」那行红字。
+        if errorMessage == Self.waitingForFixMessage { errorMessage = nil }
 
         let coordinate = bookingCoordinate(from: locationService)
         // 记下这次解析用的那个样本的精度，而不是渲染时再去读 —— 卡片上的提示说的是「这个地址」的误差。

@@ -8,13 +8,14 @@
 
 负责人 2026-11-27 定：本次直接合并，不跑真机。合并前只做过 `build-for-testing` 编译，单测一条都没执行过，复现用例也没看过它先失败。
 
-- [ ] 单测，6 个 suite 共 63 条，确认 `testRefreshWithoutAFixDoesNotCacheTheDemoCoordinate` 和 `testRefreshWithoutAFixKeepsTheDemoStartPointInMock` 实际执行并通过：
+- [ ] 单测，7 个 suite。确认 `BlindBookingGateTests` 里新加的 4 条实际执行并通过：`testRefreshWithoutAFixDoesNotCacheTheDemoCoordinate`、`testRefreshWithoutAFixKeepsTheDemoStartPointInMock`、`testSubmitWaitsForTheFirstFixAndOrdersFromIt`、`testSubmitWithoutAnyFixSendsNothingAndSaysWhatToDo`：
 
   ```bash
-  scripts/device-test.sh -only-testing:blindRunTests/BlindBookingGateTests -only-testing:blindRunTests/NearbyVolunteersTests -only-testing:blindRunTests/PreciseLocationGateTests -only-testing:blindRunTests/BlindBookingReviewAndMapTests -only-testing:blindRunTests/BlindPreRunGapsTests -only-testing:blindRunTests/VoiceOrderWizardStartPointTests
+  scripts/device-test.sh -only-testing:blindRunTests/BlindBookingGateTests -only-testing:blindRunTests/NearbyVolunteersTests -only-testing:blindRunTests/PreciseLocationGateTests -only-testing:blindRunTests/BlindBookingReviewAndMapTests -only-testing:blindRunTests/BlindPreRunGapsTests -only-testing:blindRunTests/VoiceOrderWizardStartPointTests -only-testing:blindRunTests/LaunchScopeTests
   ```
 
-- [ ] 手动（演示云端，不是 Mock）：让定位暂时拿不到（刚授权，或室内开飞行模式后开 App），进约跑页。出发点应显示「还没拿到当前位置」，点「开始找陪跑员」应提示「请选择出发地点。」。定位回来后应换成当前位置。
+- [ ] 手动（演示云端，不是 Mock），定位没到：趁定位还没回来时进约跑页（例如刚授权那一下；系统可能直接给缓存位置，复现不出就跳过）。出发点应显示「还没拿到当前位置」。点「开始找陪跑员」应转圈最多 5 秒，仍没有定位时提示「还没拿到当前位置，请稍等再点，或选常用地点。」。定位回来后红字消失。
+- [ ] 手动，临时精确位置：系统设置里关掉本 App 的「精确位置」，进约跑页，点「开始找陪跑员」，系统框选「允许一次」。应直接下单成功，出发点是当前位置，不用点第二次。
 
 ### 约跑页「目前附近无志愿者」提示卡（Jayden23018/guiderun-ios#1047，2026-11-27 合并）
 
