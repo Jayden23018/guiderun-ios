@@ -4,17 +4,20 @@ import Foundation
 extension BlindBookingViewModel {
     func submit() async -> OrderResponse? {
         guard let appState, locationService != nil else { return nil }
+        isSubmitting = true
+        // 排在门槛检查前面：起点缺着的时候 `firstMissingGate` 查不到后面的时间门槛。
+        await waitForDeviceStartPointIfNeeded()
         // 出发地点缺失要在 makeCreateOrderRequest 之后单独报，所以这里跳过 .startPoint。
         if let gate = firstMissingGate, gate != .startPoint {
+            isSubmitting = false
             return fail(message(for: gate))
         }
 
-        isSubmitting = true
         errorMessage = nil
 
         guard let request = makeCreateOrderRequest() else {
             isSubmitting = false
-            return fail("请选择出发地点。")
+            return fail(isAwaitingDeviceLocation ? Self.waitingForFixMessage : "请选择出发地点。")
         }
 
         do {
