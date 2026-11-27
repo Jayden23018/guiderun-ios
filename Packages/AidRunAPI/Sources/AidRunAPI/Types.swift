@@ -441,6 +441,18 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/orders/mine/run-records`.
     /// - Remark: Generated from `#/paths//api/orders/mine/run-records/get(getMyRunRecords)`.
     func getMyRunRecords(_ input: Operations.getMyRunRecords.Input) async throws -> Operations.getMyRunRecords.Output
+    /// 出发点附近有没有可接单的陪跑员（下单页提示）
+    ///
+    /// 角色：`BLIND`。盲人一进下单页、或换了出发点时调，传出发点坐标（与 `POST /api/orders` 的 `startLatitude` / `startLongitude` 同一坐标系）。
+    ///
+    /// 只是提示，**不拦下单**：`hasNearbyVolunteers` 为 false 时照样可以提交 `POST /api/orders`，那个端点的行为不变。
+    /// 只告诉有或没有，不给人数和距离。`hint` 在没有人时可以直接显示和播报，有人时为 `null`。
+    ///
+    /// 限流：按账号每小时 30 次（`rate-limit.nearby-volunteers`），超了返回 429。客户端拿到 429 或其他错误时当作「不知道」，不显示提示，不挡下单。
+    ///
+    /// - Remark: HTTP `GET /api/orders/nearby-volunteers`.
+    /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)`.
+    func nearbyVolunteers(_ input: Operations.nearbyVolunteers.Input) async throws -> Operations.nearbyVolunteers.Output
     /// 整句语音解析（起点/开始时间/时长/额外需求），支持带 current 做一步修正
     ///
     /// "明天八点从人民广场出发跑一小时，我带导盲犬" 一句话抽必填三槽 + 可选的额外需求。
@@ -2136,6 +2148,26 @@ extension APIProtocol {
         headers: Operations.getMyRunRecords.Input.Headers = .init()
     ) async throws -> Operations.getMyRunRecords.Output {
         try await getMyRunRecords(Operations.getMyRunRecords.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// 出发点附近有没有可接单的陪跑员（下单页提示）
+    ///
+    /// 角色：`BLIND`。盲人一进下单页、或换了出发点时调，传出发点坐标（与 `POST /api/orders` 的 `startLatitude` / `startLongitude` 同一坐标系）。
+    ///
+    /// 只是提示，**不拦下单**：`hasNearbyVolunteers` 为 false 时照样可以提交 `POST /api/orders`，那个端点的行为不变。
+    /// 只告诉有或没有，不给人数和距离。`hint` 在没有人时可以直接显示和播报，有人时为 `null`。
+    ///
+    /// 限流：按账号每小时 30 次（`rate-limit.nearby-volunteers`），超了返回 429。客户端拿到 429 或其他错误时当作「不知道」，不显示提示，不挡下单。
+    ///
+    /// - Remark: HTTP `GET /api/orders/nearby-volunteers`.
+    /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)`.
+    public func nearbyVolunteers(
+        query: Operations.nearbyVolunteers.Input.Query,
+        headers: Operations.nearbyVolunteers.Input.Headers = .init()
+    ) async throws -> Operations.nearbyVolunteers.Output {
+        try await nearbyVolunteers(Operations.nearbyVolunteers.Input(
             query: query,
             headers: headers
         ))
@@ -4422,6 +4454,67 @@ public enum Components {
             public init(
                 code: Swift.Int32,
                 data: [Components.Schemas.MissedNotificationResponse]? = nil,
+                errorCode: Swift.String? = nil,
+                hasMore: Swift.Bool? = nil,
+                message: Swift.String? = nil,
+                success: Swift.Bool
+            ) {
+                self.code = code
+                self.data = data
+                self.errorCode = errorCode
+                self.hasMore = hasMore
+                self.message = message
+                self.success = success
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+                case data
+                case errorCode
+                case hasMore
+                case message
+                case success
+            }
+        }
+        /// `ApiResponse<T>` 信封的**带 data** 形态。用于成功响应，以及少数「失败但仍要回传 data」的
+        /// 端点（目前只有 `POST /api/blind/verify-identity` 的 400，body 里带 `data.verifyStatus`）。
+        /// 纯错误响应请用 `ApiErrorResponse`。
+        ///
+        /// ⚠️ 后端 `dto/ApiResponse.java` 是 Lombok `@Data`、**没有 `@JsonInclude`**，
+        /// 所以这 5 个字段在 JSON 里**总是出现**，用不到的为 null（错误响应里 `data: null`，
+        /// 成功响应里 `errorCode: null`）。客户端不要把「字段存在」当成「字段有值」。
+        ///
+        /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse`.
+        public struct ApiResponseNearbyVolunteersResponse: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/code`.
+            public var code: Swift.Int32
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/data`.
+            public var data: Components.Schemas.NearbyVolunteersResponse?
+            /// 业务错误码，成功响应为 null。取值见 `#/components/schemas/ErrorCode` 的权威总表。
+            /// （2026-07-31 补：此前本 schema 漏了这个字段，导致 20 个错误响应的契约里查不到
+            /// 前端赖以分支的 errorCode —— 那 20 处已改用 `ApiErrorResponse`，本字段补齐是为剩下的 6 处。）
+            ///
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/errorCode`.
+            public var errorCode: Swift.String?
+            /// 窗口里是否还有未返回的通知。`true` ⇒ 拿本次最后一条的 `sentAt` 当新的 `after` 再调一次。**只有本端点会返回这个字段**，其余端点的信封里不会出现它。
+            ///
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/hasMore`.
+            public var hasMore: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/message`.
+            public var message: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ApiResponseNearbyVolunteersResponse/success`.
+            public var success: Swift.Bool
+            /// Creates a new `ApiResponseNearbyVolunteersResponse`.
+            ///
+            /// - Parameters:
+            ///   - code:
+            ///   - data:
+            ///   - errorCode: 业务错误码，成功响应为 null。取值见 `#/components/schemas/ErrorCode` 的权威总表。
+            ///   - hasMore: 窗口里是否还有未返回的通知。`true` ⇒ 拿本次最后一条的 `sentAt` 当新的 `after` 再调一次。**只有本端点会返回这个字段**，其余端点的信封里不会出现它。
+            ///   - message:
+            ///   - success:
+            public init(
+                code: Swift.Int32,
+                data: Components.Schemas.NearbyVolunteersResponse? = nil,
                 errorCode: Swift.String? = nil,
                 hasMore: Swift.Bool? = nil,
                 message: Swift.String? = nil,
@@ -9186,6 +9279,46 @@ public enum Components {
                 case priority
                 case sentAt
                 case ttsText
+            }
+        }
+        /// 下单页的提前提示（#1079）。只是提示，不拦下单：能不能下单以 `POST /api/orders` 的返回为准。
+        /// 只告诉有或没有，不给人数、不给距离。
+        ///
+        /// - Remark: Generated from `#/components/schemas/NearbyVolunteersResponse`.
+        public struct NearbyVolunteersResponse: Codable, Hashable, Sendable {
+            /// 出发点 `radiusKm` 公里内（直线距离）有没有能接这位盲人单子的陪跑员。
+            /// 「有」= 最近一段时间在这附近上报过位置、并且过得了接单资格的全部检查，不要求此刻在线：
+            /// 预约单一直派到开跑前，这期间他上线就会收到邀请。所以 true 不保证一定有人接，只保证派单有人可问
+            ///
+            /// - Remark: Generated from `#/components/schemas/NearbyVolunteersResponse/hasNearbyVolunteers`.
+            public var hasNearbyVolunteers: Swift.Bool
+            /// 没有人时给一句可以直接显示和播报的话；有人时为 null
+            ///
+            /// - Remark: Generated from `#/components/schemas/NearbyVolunteersResponse/hint`.
+            public var hint: Swift.String?
+            /// 查的半径（公里），与派单最远一轮相同。界面要自己拼文案时用它，不要写死
+            ///
+            /// - Remark: Generated from `#/components/schemas/NearbyVolunteersResponse/radiusKm`.
+            public var radiusKm: Swift.Int32
+            /// Creates a new `NearbyVolunteersResponse`.
+            ///
+            /// - Parameters:
+            ///   - hasNearbyVolunteers: 出发点 `radiusKm` 公里内（直线距离）有没有能接这位盲人单子的陪跑员。
+            ///   - hint: 没有人时给一句可以直接显示和播报的话；有人时为 null
+            ///   - radiusKm: 查的半径（公里），与派单最远一轮相同。界面要自己拼文案时用它，不要写死
+            public init(
+                hasNearbyVolunteers: Swift.Bool,
+                hint: Swift.String? = nil,
+                radiusKm: Swift.Int32
+            ) {
+                self.hasNearbyVolunteers = hasNearbyVolunteers
+                self.hint = hint
+                self.radiusKm = radiusKm
+            }
+            public enum CodingKeys: String, CodingKey {
+                case hasNearbyVolunteers
+                case hint
+                case radiusKm
             }
         }
         /// - Remark: Generated from `#/components/schemas/NotificationHistoryItem`.
@@ -22629,6 +22762,288 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// 出发点附近有没有可接单的陪跑员（下单页提示）
+    ///
+    /// 角色：`BLIND`。盲人一进下单页、或换了出发点时调，传出发点坐标（与 `POST /api/orders` 的 `startLatitude` / `startLongitude` 同一坐标系）。
+    ///
+    /// 只是提示，**不拦下单**：`hasNearbyVolunteers` 为 false 时照样可以提交 `POST /api/orders`，那个端点的行为不变。
+    /// 只告诉有或没有，不给人数和距离。`hint` 在没有人时可以直接显示和播报，有人时为 `null`。
+    ///
+    /// 限流：按账号每小时 30 次（`rate-limit.nearby-volunteers`），超了返回 429。客户端拿到 429 或其他错误时当作「不知道」，不显示提示，不挡下单。
+    ///
+    /// - Remark: HTTP `GET /api/orders/nearby-volunteers`.
+    /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)`.
+    public enum nearbyVolunteers {
+        public static let id: Swift.String = "nearbyVolunteers"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/query/latitude`.
+                public var latitude: Swift.Double
+                /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/query/longitude`.
+                public var longitude: Swift.Double
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - latitude:
+                ///   - longitude:
+                public init(
+                    latitude: Swift.Double,
+                    longitude: Swift.Double
+                ) {
+                    self.latitude = latitude
+                    self.longitude = longitude
+                }
+            }
+            public var query: Operations.nearbyVolunteers.Input.Query
+            /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.nearbyVolunteers.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.nearbyVolunteers.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.nearbyVolunteers.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.nearbyVolunteers.Input.Query,
+                headers: Operations.nearbyVolunteers.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/orders/nearby-volunteers/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ApiResponseNearbyVolunteersResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ApiResponseNearbyVolunteersResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.nearbyVolunteers.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.nearbyVolunteers.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.nearbyVolunteers.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.nearbyVolunteers.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct BadRequest: Sendable, Hashable {
+                /// Creates a new `BadRequest`.
+                public init() {}
+            }
+            /// 坐标缺失或越界
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Operations.nearbyVolunteers.Output.BadRequest)
+            /// 坐标缺失或越界
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            public static var badRequest: Self {
+                .badRequest(.init())
+            }
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Operations.nearbyVolunteers.Output.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Unauthorized: Sendable, Hashable {
+                /// Creates a new `Unauthorized`.
+                public init() {}
+            }
+            /// 未认证
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Operations.nearbyVolunteers.Output.Unauthorized)
+            /// 未认证
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            public static var unauthorized: Self {
+                .unauthorized(.init())
+            }
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Operations.nearbyVolunteers.Output.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// Creates a new `Forbidden`.
+                public init() {}
+            }
+            /// 非 BLIND 角色
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.nearbyVolunteers.Output.Forbidden)
+            /// 非 BLIND 角色
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            public static var forbidden: Self {
+                .forbidden(.init())
+            }
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.nearbyVolunteers.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct TooManyRequests: Sendable, Hashable {
+                /// Creates a new `TooManyRequests`.
+                public init() {}
+            }
+            /// 查得太频繁
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            case tooManyRequests(Operations.nearbyVolunteers.Output.TooManyRequests)
+            /// 查得太频繁
+            ///
+            /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            public static var tooManyRequests: Self {
+                .tooManyRequests(.init())
+            }
+            /// The associated value of the enum case if `self` is `.tooManyRequests`.
+            ///
+            /// - Throws: An error if `self` is not `.tooManyRequests`.
+            /// - SeeAlso: `.tooManyRequests`.
+            public var tooManyRequests: Operations.nearbyVolunteers.Output.TooManyRequests {
+                get throws {
+                    switch self {
+                    case let .tooManyRequests(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "tooManyRequests",
                             response: self
                         )
                     }

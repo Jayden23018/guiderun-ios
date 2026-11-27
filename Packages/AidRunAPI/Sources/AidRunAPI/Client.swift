@@ -2593,6 +2593,95 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// 出发点附近有没有可接单的陪跑员（下单页提示）
+    ///
+    /// 角色：`BLIND`。盲人一进下单页、或换了出发点时调，传出发点坐标（与 `POST /api/orders` 的 `startLatitude` / `startLongitude` 同一坐标系）。
+    ///
+    /// 只是提示，**不拦下单**：`hasNearbyVolunteers` 为 false 时照样可以提交 `POST /api/orders`，那个端点的行为不变。
+    /// 只告诉有或没有，不给人数和距离。`hint` 在没有人时可以直接显示和播报，有人时为 `null`。
+    ///
+    /// 限流：按账号每小时 30 次（`rate-limit.nearby-volunteers`），超了返回 429。客户端拿到 429 或其他错误时当作「不知道」，不显示提示，不挡下单。
+    ///
+    /// - Remark: HTTP `GET /api/orders/nearby-volunteers`.
+    /// - Remark: Generated from `#/paths//api/orders/nearby-volunteers/get(nearbyVolunteers)`.
+    public func nearbyVolunteers(_ input: Operations.nearbyVolunteers.Input) async throws -> Operations.nearbyVolunteers.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.nearbyVolunteers.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/orders/nearby-volunteers",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "latitude",
+                    value: input.query.latitude
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "longitude",
+                    value: input.query.longitude
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.nearbyVolunteers.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ApiResponseNearbyVolunteersResponse.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                case 400:
+                    return .badRequest(.init())
+                case 401:
+                    return .unauthorized(.init())
+                case 403:
+                    return .forbidden(.init())
+                case 429:
+                    return .tooManyRequests(.init())
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// 整句语音解析（起点/开始时间/时长/额外需求），支持带 current 做一步修正
     ///
     /// "明天八点从人民广场出发跑一小时，我带导盲犬" 一句话抽必填三槽 + 可选的额外需求。

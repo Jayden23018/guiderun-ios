@@ -55,6 +55,7 @@ filter:
     - /api/orders/available
     - /api/orders/mine
     - /api/orders/mine/run-records
+    - /api/orders/nearby-volunteers
     - /api/orders/voice/parse
     - /api/orders/voice/parse-slot
     - /api/orders/voice/resolve-address
